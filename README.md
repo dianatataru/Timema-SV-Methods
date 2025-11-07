@@ -50,7 +50,7 @@ Cactus minigraph does require designating a reference, and you can actually desi
 #!/bin/sh 
 #SBATCH --time=240:00:00
 #SBATCH --nodes=1
-#SBATCH --ntasks=24
+#SBATCH -n 24
 #SBATCH --account=gompert
 #SBATCH --partition=gompert-grn
 #SBATCH --job-name=cactus-pangenome
@@ -67,9 +67,7 @@ cactus-pangenome timemaJS \
   /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/HWY154.txt \
   --outDir /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus \
   --outName HWY154 \
-  --reference t_crist_hwy154_cen4119.1 \
-  --batchSystem slurm --doubleMem true \
-  --maxCores 80 \
+  --maxCores 24 \
   --vcf --giraffe --gfa --gbz
 
 ```
