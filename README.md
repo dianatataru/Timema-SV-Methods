@@ -71,3 +71,31 @@ cactus-pangenome timemaJS \
   --vcf --giraffe --gfa --gbz
 
 ```
+Not working. error is: environment:ancestorsmlmp.py not found. 
+
+Going to try running it step by step:
+
+```
+#!/bin/sh 
+#SBATCH --time=240:00:00
+#SBATCH --nodes=1
+#SBATCH -n 24
+#SBATCH --account=gompert
+#SBATCH --partition=gompert-grn
+#SBATCH --job-name=cactus-pangenome
+#SBATCH --qos gompert-grn
+#SBATCH -e /scratch/general/nfs1/u6071015/cactusNp/timema/cactus-pangenome-%j.err
+#SBATCH -o /scratch/general/nfs1/u6071015/cactusNp/timema/cactus-pangenome-%j.out
+
+module load cactus
+module load python3
+
+cd /scratch/general/nfs1/u6071015/cactusNp/timema/
+
+cactus-pangenome timemaJS \
+  /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/HWY154.txt \
+  --outDir /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus \
+  --outName HWY154 \
+  --maxCores 24 \
+  --vcf --giraffe --gfa --gbz
+```
