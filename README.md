@@ -44,7 +44,7 @@ t_crist_refug_cen4120.1 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/
 t_crist_refug_cen4120.2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_refug_cen4120_hap2.fasta.masked
 ```
 
-Cactus minigraph does require designating a reference, and you can actually designate multiple to use as the basis for VCF files (with command --vcfReference). Other commands that I haven't run yet but could include if the graph seems weird, are --permissiveContigFilter and --noSplit (which disables chromosome splitting). Now starting the minigraph pipeline:
+Cactus minigraph does require designating a reference, and you can actually designate multiple to use as the basis for VCF files (with command --vcfReference). Other commands that I haven't run yet but could include if the graph seems weird, are --permissiveContigFilter and --noSplit (which disables chromosome splitting). Now starting the minigraph pipeline with script ```run_cactus-pangenome.sh```:
 
 ```
 #!/bin/sh 
@@ -67,6 +67,7 @@ cactus-pangenome timemaJS \
   /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/HWY154.txt \
   --outDir /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus \
   --outName HWY154 \
+  --reference t_crist_hwy154_cen4119_hap1.fasta.masked \
   --maxCores 24 \
   --vcf --giraffe --gfa --gbz
 
@@ -87,8 +88,10 @@ Going to try running it step by step:
 #SBATCH -e /scratch/general/nfs1/u6071015/cactusNp/timema/cactus-pangenome-%j.err
 #SBATCH -o /scratch/general/nfs1/u6071015/cactusNp/timema/cactus-pangenome-%j.out
 
-module load cactus
+module load cactus/3.0.1
 module load python3
+#export PATH=/home/cactus/bin:$PATH
+export SINGULARITYENV_PATH="/home/cactus/bin:/usr/local/bin:/usr/bin:/bin"
 
 cd /scratch/general/nfs1/u6071015/cactusNp/timema/
 
@@ -96,6 +99,12 @@ cactus-pangenome timemaJS \
   /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/HWY154.txt \
   --outDir /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus \
   --outName HWY154 \
+  --reference t_crist_hwy154_cen4119_hap1 \
   --maxCores 24 \
   --vcf --giraffe --gfa --gbz
+
+cactus-minigraph timemaJS \
+  /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/HWY154.txt \
+  HWY154.sv.gfa.gz --reference t_crist_hwy154_cen4119_hap1.fasta.masked 
+
 ```
