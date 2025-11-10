@@ -78,6 +78,7 @@ But it does work as an interactive script...
 
 ```
 salloc --time=10:00:00 --ntasks 24 --nodes=1 --account=gompert --partition=gompert-grn --qos=gompert-grn --mem=100G
+cd /scratch/general/nfs1/u6071015/cactusNp/timema/
 module load cactus/3.0.1
 module load apptainer/1.4.0  
 APPTAINERENV_PREPEND_PATH="/home/cactus/bin"
@@ -91,4 +92,3 @@ cactus-pangenome timemaJS \
   --vcf --giraffe --gfa --gbz
 ```
 
-Exits with non-zero status 137, and Out of memory (2 oom_kill events).
