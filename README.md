@@ -63,7 +63,6 @@ Not working in SBATCH. error is: environment:ancestorsmlmp.py not found.
 source deactivate
 
 module load cactus/3.0.1
-APPTAINERENV_PREPEND_PATH="/home/cactus/bin"
 
 cd /scratch/general/nfs1/u6071015/cactusNp/timema/
 
