@@ -23,10 +23,10 @@ ln -s /uufs/chpc.utah.edu/common/home/gompert-group4/data/timema/hic_genomes/t_c
 ln -s /uufs/chpc.utah.edu/common/home/gompert-group4/data/timema/hic_genomes/t_crist_refug_green/HiRise/hap1/chroms_final_assembly.fasta.masked t_crist_refug_cen4120_hap1.fasta.masked
 ln -s /uufs/chpc.utah.edu/common/home/gompert-group4/data/timema/hic_genomes/t_crist_refug_green/HiRise/hap2/chroms_final_assembly.fasta.masked t_crist_refug_cen4120_hap2.fasta.masked
 ```
-Make the HWY154.txt input file:
+Make the HWY154.txt input file (reference can't start with same name as other samples):
 
 ```
-t_crist_hwy154_cen4119.1 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap1.fasta.masked
+Hap1_t_crist_hwy154_cen4119 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap1.fasta.masked
 t_crist_hwy154_cen4119.2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap2.fasta.masked
 t_crist_hwy154_cen4280.1 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4280_hap1.fasta.masked
 t_crist_hwy154_cen4280.2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4280_hap2.fasta.masked 
@@ -46,35 +46,7 @@ t_crist_refug_cen4120.2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/
 
 Cactus minigraph does require designating a reference, and you can actually designate multiple to use as the basis for VCF files (with command --vcfReference). Other commands that I haven't run yet but could include if the graph seems weird, are --permissiveContigFilter and --noSplit (which disables chromosome splitting). Now starting the minigraph pipeline with script ```run_cactus-pangenome.sh```:
 
-```
-#!/bin/sh 
-#SBATCH --time=240:00:00
-#SBATCH --nodes=1
-#SBATCH -n 24
-#SBATCH --account=gompert
-#SBATCH --partition=gompert-grn
-#SBATCH --job-name=cactus-pangenome
-#SBATCH --qos gompert-grn
-#SBATCH -e /scratch/general/nfs1/u6071015/cactusNp/timema/cactus-pangenome-%j.err
-#SBATCH -o /scratch/general/nfs1/u6071015/cactusNp/timema/cactus-pangenome-%j.out
-
-module load cactus
-module load python3
-
-cd /scratch/general/nfs1/u6071015/cactusNp/timema/
-
-cactus-pangenome timemaJS \
-  /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/HWY154.txt \
-  --outDir /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus \
-  --outName HWY154 \
-  --reference t_crist_hwy154_cen4119_hap1.fasta.masked \
-  --maxCores 24 \
-  --vcf --giraffe --gfa --gbz
-
-```
-Not working. error is: environment:ancestorsmlmp.py not found. 
-
-Going to try running it step by step:
+Not working in SBATCH. error is: environment:ancestorsmlmp.py not found. 
 
 ```
 #!/bin/sh 
@@ -89,9 +61,7 @@ Going to try running it step by step:
 #SBATCH -o /scratch/general/nfs1/u6071015/cactusNp/timema/cactus-pangenome-%j.out
 
 module load cactus/3.0.1
-module load python3
-#export PATH=/home/cactus/bin:$PATH
-export SINGULARITYENV_PATH="/home/cactus/bin:/usr/local/bin:/usr/bin:/bin"
+APPTAINERENV_PREPEND_PATH="/home/cactus/bin"
 
 cd /scratch/general/nfs1/u6071015/cactusNp/timema/
 
@@ -99,12 +69,26 @@ cactus-pangenome timemaJS \
   /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/HWY154.txt \
   --outDir /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus \
   --outName HWY154 \
-  --reference t_crist_hwy154_cen4119_hap1 \
+  --reference Hap1_t_crist_hwy154_cen4119 \
   --maxCores 24 \
   --vcf --giraffe --gfa --gbz
 
-cactus-minigraph timemaJS \
-  /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/HWY154.txt \
-  HWY154.sv.gfa.gz --reference t_crist_hwy154_cen4119_hap1.fasta.masked 
+```
+But it does work as an interactive script...
 
 ```
+salloc --time=10:00:00 --ntasks 24 --nodes=1 --account=gompert --partition=gompert-grn --qos=gompert-grn --mem=100G
+module load cactus/3.0.1
+module load apptainer/1.4.0  
+APPTAINERENV_PREPEND_PATH="/home/cactus/bin"
+
+cactus-pangenome timemaJS \
+  /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/HWY154.txt \
+  --outDir /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus \
+  --outName HWY154 \
+  --reference Hap1_t_crist_hwy154_cen4119 \
+  --maxCores 12 \
+  --vcf --giraffe --gfa --gbz
+```
+
+Exits with non-zero status 137, and Out of memory (2 oom_kill events).
