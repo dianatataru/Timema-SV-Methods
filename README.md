@@ -60,6 +60,8 @@ Not working in SBATCH. error is: environment:ancestorsmlmp.py not found.
 #SBATCH -e /scratch/general/nfs1/u6071015/cactusNp/timema/cactus-pangenome-%j.err
 #SBATCH -o /scratch/general/nfs1/u6071015/cactusNp/timema/cactus-pangenome-%j.out
 
+source deactivate
+
 module load cactus/3.0.1
 APPTAINERENV_PREPEND_PATH="/home/cactus/bin"
 
