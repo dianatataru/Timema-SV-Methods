@@ -60,8 +60,6 @@ Not working in SBATCH. error is: environment:ancestorsmlmp.py not found.
 #SBATCH -e /scratch/general/nfs1/u6071015/cactusNp/timema/cactus-pangenome-%j.err
 #SBATCH -o /scratch/general/nfs1/u6071015/cactusNp/timema/cactus-pangenome-%j.out
 
-source deactivate
-
 module load cactus/3.0.1
 
 cd /scratch/general/nfs1/u6071015/cactusNp/timema/
@@ -81,8 +79,8 @@ But it does work as an interactive script...
 salloc --time=10:00:00 --ntasks 24 --nodes=1 --account=gompert --partition=gompert-grn --qos=gompert-grn --mem=100G
 cd /scratch/general/nfs1/u6071015/cactusNp/timema/
 module load cactus/3.0.1
-module load apptainer/1.4.0  
-APPTAINERENV_PREPEND_PATH="/home/cactus/bin"
+#module load apptainer/1.4.0  
+#APPTAINERENV_PREPEND_PATH="/home/cactus/bin"
 
 cactus-pangenome timemaJS \
   /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/HWY154.txt \
@@ -92,7 +90,7 @@ cactus-pangenome timemaJS \
   --maxCores 12 \
   --vcf --giraffe --gfa --gbz
 ```
-Even with 100G, getting this error:
+Even with 100G, past the limit (107G), increase for 8 genomes. Getting this error:
 
 ```
 Got message from job at time 11-10-2025 17:18:07: Job used more disk than requested. For CWL, consider increasing the outdirMin requirement, otherwise, consider increasing the disk requirement. Job 'unzip_gz' kind-unzip_gz/instance-b62o1k6q v1 used 102.02% disk (1.9 GiB [2029998080B] used, 1.9 GiB [1989727325B] requested).
