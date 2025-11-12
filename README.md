@@ -49,7 +49,7 @@ Cactus minigraph does require designating a reference, and you can actually desi
 Not working in SBATCH. error is: environment:ancestorsmlmp.py not found. 
 
 ```
-#!/bin/sh 
+#!/bin/bash 
 #SBATCH --time=240:00:00
 #SBATCH --nodes=1
 #SBATCH -n 24
@@ -57,7 +57,7 @@ Not working in SBATCH. error is: environment:ancestorsmlmp.py not found.
 #SBATCH --account=gompert
 #SBATCH --partition=gompert-grn
 #SBATCH --job-name=cactus-pangenome
-#SBATCH --qos gompert-grn
+#SBATCH --qos=gompert-grn
 #SBATCH -e /scratch/general/nfs1/u6071015/cactusNp/timema/cactus-pangenome-%j.err
 #SBATCH -o /scratch/general/nfs1/u6071015/cactusNp/timema/cactus-pangenome-%j.out
 
@@ -71,10 +71,10 @@ cactus-pangenome timemaJS \
   --outName HWY154 \
   --reference Hap1_t_crist_hwy154_cen4119 \
   --maxCores 24 \
-  --vcf --giraffe --gfa --gbz
+  --vcf --giraffe --gfa --gbz --viz
 
 ```
-But it does work as an interactive script...
+Also works as an interactive script:
 
 ```
 salloc --time=10:00:00 --ntasks 24 --nodes=1 --account=gompert --partition=gompert-grn --qos=gompert-grn --mem=100G
@@ -100,3 +100,30 @@ Finished after about 10 hours in interactive job.
 
 Quickly visualize output vg easily with tube map onlione demo:https://vgteam.github.io/sequenceTubeMap/. but the file has to be under 5 mb so subset or run on cluster.
 Possible analysis can be done in odgi: https://odgi.readthedocs.io/en/latest/
+
+### Investigating Cactus Output
+
+Output with Hap1_t_crist_hwy154_cen4119 as reference:
+```
+halStats HWY154.full.hal
+INFO:    gocryptfs not found, will not be able to use gocryptfs
+
+hal v2.2
+(t_crist_hwy154_cen4280.1:1,t_crist_hwy154_cen4119.2:1,t_crist_hwy154_cen4280.2:1,Hap1_t_crist_hwy154_cen4119:1)Anc0;
+
+GenomeName,         NumChildren, Length,   NumSequences, NumTopSegments, NumBottomSegments
+Anc0,                     4,     1697544243, 645100,     0,             14123991
+t_crist_hwy154_cen4280.1, 0,     1204896739, 13,         10845222,       0
+t_crist_hwy154_cen4119.2, 0,     1226560494, 13,         10915768,       0
+t_crist_hwy154_cen4280.2, 0,     1215314917, 13,         10916299,       0
+Hap1_t_crist_hwy154_cen4119, 0,  1220429573, 13,         10949670,       0
+```
+
+how the raw.vcf file looks:
+```
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	t_crist_hwy154_cen4119	t_crist_hwy154_cen4280
+Scaffold_10__1_contigs__length_74320458	8053	>36>38	A	ATA	60	AC=1;AF=1;AN=1;AT=>36>38,>36>37>38;NS=1;LV=0	GT	.|.	1|.
+Scaffold_10__1_contigs__length_74320458	13799	>43>45	T	TC	60	AC=1;AF=1;AN=1;AT=>43>45,>43>44>45;NS=1;LV=0	GT	.|.	1|.
+Scaffold_10__1_contigs__length_74320458	14013	>45>47	GA	G	60	AC=1;AF=1;AN=1;AT=>45>46>47,>45>47;NS=1;LV=0	GT	.|.	1|.
+```
+
