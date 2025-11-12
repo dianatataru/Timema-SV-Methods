@@ -95,3 +95,6 @@ Even with 100G, past the limit (107G), increase for 8 genomes. Getting this erro
 ```
 Got message from job at time 11-10-2025 17:18:07: Job used more disk than requested. For CWL, consider increasing the outdirMin requirement, otherwise, consider increasing the disk requirement. Job 'unzip_gz' kind-unzip_gz/instance-b62o1k6q v1 used 102.02% disk (1.9 GiB [2029998080B] used, 1.9 GiB [1989727325B] requested).
 ```
+Quickly visualize output vg easily with tube map onlione demo:https://vgteam.github.io/sequenceTubeMap/
+
+Possible analysis can be done in odgi: https://odgi.readthedocs.io/en/latest/
