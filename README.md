@@ -127,3 +127,47 @@ Scaffold_10__1_contigs__length_74320458	13799	>43>45	T	TC	60	AC=1;AF=1;AN=1;AT=>
 Scaffold_10__1_contigs__length_74320458	14013	>45>47	GA	G	60	AC=1;AF=1;AN=1;AT=>45>46>47,>45>47;NS=1;LV=0	GT	.|.	1|.
 ```
 
+and for REF included:
+```
+halStats HWY154_REF.full.hal 
+
+hal v2.2
+(t_crist_refug_cen4120.2:1,t_crist_refug_cen4122.2:1,t_crist_refug_cen4120.1:1,t_crist_refug_cen4122.1:1,t_crist_hwy154_cen4280.1:1,t_crist_hwy154_cen4119.2:1,t_crist_hwy154_cen4280.2:1,Hap1_t_crist_hwy154_cen4119:1)Anc0;
+
+GenomeName, NumChildren, Length, NumSequences, NumTopSegments, NumBottomSegments
+Anc0, 8, 2317835600, 1465030, 0, 24034530
+t_crist_refug_cen4120.2, 0, 913092304, 11, 13453958, 0
+t_crist_refug_cen4122.2, 0, 918956906, 11, 13528212, 0
+t_crist_refug_cen4120.1, 0, 919573812, 11, 13420062, 0
+t_crist_refug_cen4122.1, 0, 1227621598, 13, 17085224, 0
+t_crist_hwy154_cen4280.1, 0, 1204896739, 13, 17105678, 0
+t_crist_hwy154_cen4119.2, 0, 1226560494, 13, 17235926, 0
+t_crist_hwy154_cen4280.2, 0, 1215314917, 13, 17244420, 0
+Hap1_t_crist_hwy154_cen4119, 0, 1220429573, 13, 17266391, 0
+```
+
+From Science paper, length of chromosomes:
+
+Table S1: Homologous relationships among chromosome-size scaffolds for the T. cristinae
+genomes. Chromosome 13 is the X sex chromosome. Abbreviations are as follows: Chr = chromosome,
+U GS = unphased stripe genome from (82), R = Refugio, H = Hwy154, GS1 = striped
+haplotype 1, GS2 = striped haplotype 2, GUS1 = green haplotype 1, and GUS2 = green haplotype.
+4119, 4122=striped and 4120,4280=green
+
+|Chr |U GS |R GS1 |R GS2 |R GUS1 |R GUS2 |H GS1 |H GS2 |H GUS1 |H GUS2|
+|----|-----|------|------|-------|------ |------|------|-------|------|
+|  1 | 8483|  12  |  10  |   4   |   6   |  13  |  13  |  22   |  15  |
+| 2  |14640|   6  |   8  |  11   |   9   |   5  |   6  |  23   |   1  |
+| 3  |42935|   2  |   1  |   1   |   1   |   3  |   2  |  16   |   3  |
+| 4  |42912|   1  |   1  |   1   |   1   |   1  |   1  |  64   |  35  |
+| 5  |18722|   7  |   2  |   6   |   4   |  12  |  12  |   5   |  10  |
+| 6  |9928 |   8  |   5  |   7   |   5   |   4  |   5  |  11   |  44  |
+| 7  |10660|  10  |   7  |  10   |  11   |  10  |   8  |  54   |   7  |
+| 8  |7748 |  11  |   9  |   3   |   3   |  11  |   4  |   7   |  23  |
+| 9  |16151|   5  |   4  |   9   |   8   |   8  |   9  |  46   |  21  |
+| 10 |14160|   4  |   3  |   8   |  10   |   7  |   7  |  15   |  16  |
+| 11 |12033|   9  |   6  |   5   |   7   |   9  |  10  |   2   |  12  |
+| 12 |12380|  13  |  12  |  12   |  12   |   6  |  11  |   1   |  36  |
+| 13 |14101|   3  |  11  |   2   |   2   |   2  |   3  |  36   |   8  |
+
+
