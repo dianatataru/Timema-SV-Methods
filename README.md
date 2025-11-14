@@ -170,5 +170,19 @@ haplotype 1, GS2 = striped haplotype 2, GUS1 = green haplotype 1, and GUS2 = gre
 | 12 |12380|  13  |  12  |  12   |  12   |   6  |  11  |   1   |  36  |
 | 13 |14101|   3  |  11  |   2   |   2   |   2  |   3  |  36   |   8  |
 
+### Using sequenceTubeMap
 
+Downloaded to local computer using these instructions: https://github.com/vgteam/sequenceTubeMap?tab=readme-ov-file
 
+then to run tube map on local computer in terminal:
+
+```
+cd ~/Desktop/GitHub/sequenceTubeMap
+nvm use
+npm run serve
+```
+Then I uploaded the .gbz and .gaf file into the folder ~/Desktop/GitHub/sequenceTubeMap/exampleData following these instructions: https://github.com/vgteam/sequenceTubeMap/blob/master/doc/data.md. I went here to visualize: http://localhost:3000.
+
+No variant appeared in the graph, so I think I need to do some configuration of the .gaf file, I think building a tabix file, like here: https://github.com/vgteam/sequenceTubeMap/blob/master/README.tabix.md
+
+Maybe just need to : tabix hwy154.gfa.gz and upload to sequencetube
