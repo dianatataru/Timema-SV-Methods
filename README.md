@@ -26,8 +26,8 @@ ln -s /uufs/chpc.utah.edu/common/home/gompert-group4/data/timema/hic_genomes/t_c
 Make the HWY154.txt input file (reference can't start with same name as other samples):
 
 ```
-Hap1_t_crist_hwy154_cen4119 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap1.fasta.masked
-t_crist_hwy154_cen4119.2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap2.fasta.masked
+t_crist_hwy154_cen4119.1 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap1.fasta.masked
+Hap2_t_crist_hwy154_cen4119.2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap2.fasta.masked
 t_crist_hwy154_cen4280.1 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4280_hap1.fasta.masked
 t_crist_hwy154_cen4280.2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4280_hap2.fasta.masked 
 ```
@@ -35,7 +35,7 @@ Make the HWY154_REF.txt input file:
 
 ```
 t_crist_hwy154_cen4119.1 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap1.fasta.masked
-t_crist_hwy154_cen4119.2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap2.fasta.masked
+Hap2_t_crist_hwy154_cen4119.2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap2.fasta.masked
 t_crist_hwy154_cen4280.1 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4280_hap1.fasta.masked
 t_crist_hwy154_cen4280.2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4280_hap2.fasta.masked 
 t_crist_refug_cen4122.1 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_refug_cen4122_hap1.fasta.masked
@@ -101,37 +101,29 @@ Possible analysis can be done in odgi: https://odgi.readthedocs.io/en/latest/
 
 ### Investigating Cactus Output
 
-Output with Hap1_t_crist_hwy154_cen4119 as reference:
+halStats output:
+
 ```
-halStats HWY154.full.hal
-INFO:    gocryptfs not found, will not be able to use gocryptfs
-
-hal v2.2
-(t_crist_hwy154_cen4280.1:1,t_crist_hwy154_cen4119.2:1,t_crist_hwy154_cen4280.2:1,Hap1_t_crist_hwy154_cen4119:1)Anc0;
-
+#with Hap1_t_crist_hwy154_cen4119 as reference
 GenomeName,         NumChildren, Length,   NumSequences, NumTopSegments, NumBottomSegments
 Anc0,                     4,     1697544243, 645100,     0,             14123991
 t_crist_hwy154_cen4280.1, 0,     1204896739, 13,         10845222,       0
 t_crist_hwy154_cen4119.2, 0,     1226560494, 13,         10915768,       0
 t_crist_hwy154_cen4280.2, 0,     1215314917, 13,         10916299,       0
 Hap1_t_crist_hwy154_cen4119, 0,  1220429573, 13,         10949670,       0
-```
 
-how the raw.vcf file looks:
-```
-#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	t_crist_hwy154_cen4119	t_crist_hwy154_cen4280
-Scaffold_10__1_contigs__length_74320458	8053	>36>38	A	ATA	60	AC=1;AF=1;AN=1;AT=>36>38,>36>37>38;NS=1;LV=0	GT	.|.	1|.
-Scaffold_10__1_contigs__length_74320458	13799	>43>45	T	TC	60	AC=1;AF=1;AN=1;AT=>43>45,>43>44>45;NS=1;LV=0	GT	.|.	1|.
-Scaffold_10__1_contigs__length_74320458	14013	>45>47	GA	G	60	AC=1;AF=1;AN=1;AT=>45>46>47,>45>47;NS=1;LV=0	GT	.|.	1|.
-```
+#with Hap2_t_crist_hwy154_cen4119 as reference
+GenomeName, NumChildren, Length, NumSequences, NumTopSegments, NumBottomSegments
+Anc0, 4, 1682922426, 645056, 0, 14164284
+t_crist_hwy154_cen4280.2, 0, 1215314917, 13, 10944330, 0
+t_crist_hwy154_cen4280.1, 0, 1204896739, 13, 10883086, 0
+Hap2_t_crist_hwy154_cen4119.2, 0, 1226560494, 13, 11005277, 0
+t_crist_hwy154_cen4119.1, 0, 1220429573, 13, 10903134, 0
 
-and for REF included:
 ```
-halStats HWY154_REF.full.hal 
-
-hal v2.2
-(t_crist_refug_cen4120.2:1,t_crist_refug_cen4122.2:1,t_crist_refug_cen4120.1:1,t_crist_refug_cen4122.1:1,t_crist_hwy154_cen4280.1:1,t_crist_hwy154_cen4119.2:1,t_crist_hwy154_cen4280.2:1,Hap1_t_crist_hwy154_cen4119:1)Anc0;
-
+and for pangenomes with Refugio included:
+```
+#Hwy 154 Striped Haplotype 1 as Reference: 
 GenomeName, NumChildren, Length, NumSequences, NumTopSegments, NumBottomSegments
 Anc0, 8, 2317835600, 1465030, 0, 24034530
 t_crist_refug_cen4120.2, 0, 913092304, 11, 13453958, 0
@@ -142,9 +134,29 @@ t_crist_hwy154_cen4280.1, 0, 1204896739, 13, 17105678, 0
 t_crist_hwy154_cen4119.2, 0, 1226560494, 13, 17235926, 0
 t_crist_hwy154_cen4280.2, 0, 1215314917, 13, 17244420, 0
 Hap1_t_crist_hwy154_cen4119, 0, 1220429573, 13, 17266391, 0
-```
 
-From Science paper, length of chromosomes:
+#Hwy 154 Striped Haplotype 2 as Reference:
+GenomeName, NumChildren, Length, NumSequences, NumTopSegments, NumBottomSegments
+Anc0, 8, 2597813988, 1465202, 0, 24632873
+t_crist_refug_cen4120.1, 0, 1239970858, 12, 15785477, 0
+t_crist_refug_cen4122.1, 0, 1227621598, 13, 17528880, 0
+t_crist_hwy154_cen4280.2, 0, 1215314917, 13, 17664031, 0
+t_crist_hwy154_cen4280.1, 0, 1204896739, 13, 17523127, 0
+t_crist_refug_cen4122.2, 0, 918956906, 11, 13595387, 0
+Hap2_t_crist_hwy154_cen4119.2, 0, 1226560494, 13, 17722387, 0
+t_crist_refug_cen4120.2, 0, 1235469353, 12, 15808690, 0
+t_crist_hwy154_cen4119.1, 0, 1220429573, 13, 17566620, 0
+
+```
+The outputs of HalSummarizeMutations are in this google sheet:https://docs.google.com/spreadsheets/d/1sTRpJKJHh38i-38SDlRJKjfCCZoWqW8oGsbMvjLeViY/edit?usp=sharing
+This is how the raw.vcf file looks (head):
+```
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	t_crist_hwy154_cen4119	t_crist_hwy154_cen4280
+Scaffold_10__1_contigs__length_74320458	8053	>36>38	A	ATA	60	AC=1;AF=1;AN=1;AT=>36>38,>36>37>38;NS=1;LV=0	GT	.|.	1|.
+Scaffold_10__1_contigs__length_74320458	13799	>43>45	T	TC	60	AC=1;AF=1;AN=1;AT=>43>45,>43>44>45;NS=1;LV=0	GT	.|.	1|.
+Scaffold_10__1_contigs__length_74320458	14013	>45>47	GA	G	60	AC=1;AF=1;AN=1;AT=>45>46>47,>45>47;NS=1;LV=0	GT	.|.	1|.
+```
+From Science paper (Gompert et al. 2025), length of chromosomes:
 
 Table S1: Homologous relationships among chromosome-size scaffolds for the T. cristinae
 genomes. Chromosome 13 is the X sex chromosome. Abbreviations are as follows: Chr = chromosome,
@@ -181,4 +193,4 @@ npm run serve
 ```
 I uploaded the .gbz and .gaf file from the cluster into the folder ~/Desktop/GitHub/sequenceTubeMap/exampleData following these instructions: https://github.com/vgteam/sequenceTubeMap/blob/master/doc/data.md. I went here to visualize: http://localhost:3000.
 
-The .gbz gets mounted as the graph and haplotype, while the .gaf can be mounted as the reads. Make sure to index the .gaf file with tabix (htslib), and upload the index file to /exampleData/ as well. This 
+The .gbz gets mounted as the graph and haplotype, while the .gaf can be mounted as the reads. Make sure to index the .gaf file with tabix (htslib), and upload the index file to /exampleData/ as well. 
