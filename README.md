@@ -44,9 +44,7 @@ t_crist_refug_cen4120.1 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/
 t_crist_refug_cen4120.2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_refug_cen4120_hap2.fasta.masked
 ```
 
-Cactus minigraph does require designating a reference, and you can actually designate multiple to use as the basis for VCF files (with command --vcfReference). Other commands that I haven't run yet but could include if the graph seems weird, are --permissiveContigFilter and --noSplit (which disables chromosome splitting). Now starting the minigraph pipeline with script ```run_cactus-pangenome.sh```:
-
-Not working in SBATCH. error is: environment:ancestorsmlmp.py not found. 
+Cactus minigraph does require designating a reference, and you can actually designate multiple to use as the basis for VCF files (with command --vcfReference). The cactus publication runs on twp different references and chooses the longest one. Other commands that I haven't run yet but could include if the graph seems weird, are --permissiveContigFilter and --noSplit (which disables chromosome splitting). Also, --vcfbub by default flattens the vcf and removes nested variants. If I want that not to happen, I have to set --vcfbub 0. This might make downstream annotation harder. Other things to note on this graph: minigraph only uses SVs > 50 bp in graph construction, and also clips out stretches of sequences >= 10 kb that do not align to minigraph. Now starting the minigraph pipeline with script ```run_cactus-pangenome.sh```:
 
 ```
 #!/bin/bash 
@@ -98,7 +96,7 @@ Got message from job at time 11-10-2025 17:18:07: Job used more disk than reques
 ```
 Finished after about 10 hours in interactive job.
 
-Quickly visualize output vg easily with tube map onlione demo:https://vgteam.github.io/sequenceTubeMap/. but the file has to be under 5 mb so subset or run on cluster.
+Quickly visualize output vg with tube map onlione demo:https://vgteam.github.io/sequenceTubeMap/. but the file has to be under 5 mb so subset or run on local computer.
 Possible analysis can be done in odgi: https://odgi.readthedocs.io/en/latest/
 
 ### Investigating Cactus Output
@@ -174,15 +172,13 @@ haplotype 1, GS2 = striped haplotype 2, GUS1 = green haplotype 1, and GUS2 = gre
 
 Downloaded to local computer using these instructions: https://github.com/vgteam/sequenceTubeMap?tab=readme-ov-file
 
-then to run tube map on local computer in terminal:
+Then to run tube map on local computer in terminal:
 
 ```
 cd ~/Desktop/GitHub/sequenceTubeMap
 nvm use
 npm run serve
 ```
-Then I uploaded the .gbz and .gaf file into the folder ~/Desktop/GitHub/sequenceTubeMap/exampleData following these instructions: https://github.com/vgteam/sequenceTubeMap/blob/master/doc/data.md. I went here to visualize: http://localhost:3000.
+I uploaded the .gbz and .gaf file from the cluster into the folder ~/Desktop/GitHub/sequenceTubeMap/exampleData following these instructions: https://github.com/vgteam/sequenceTubeMap/blob/master/doc/data.md. I went here to visualize: http://localhost:3000.
 
-No variant appeared in the graph, so I think I need to do some configuration of the .gaf file, I think building a tabix file, like here: https://github.com/vgteam/sequenceTubeMap/blob/master/README.tabix.md
-
-Maybe just need to : tabix hwy154.gfa.gz and upload to sequencetube
+The .gbz gets mounted as the graph and haplotype, while the .gaf can be mounted as the reads. Make sure to index the .gaf file with tabix (htslib), and upload the index file to /exampleData/ as well. This 
