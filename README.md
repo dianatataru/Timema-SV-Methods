@@ -171,3 +171,4 @@ haplotype 1, GS2 = striped haplotype 2, GUS1 = green haplotype 1, and GUS2 = gre
 | 13 |14101|   3  |  11  |   2   |   2   |   2  |   3  |  36   |   8  |
 
 
+
