@@ -233,9 +233,7 @@ cactus-graphmap-join /scratch/general/nfs1/u6071015/cactusNp/timema/timema8hapJS
    --outDir /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus/HWY154_REF_4119Hap2/chroms \
    --outName HWY154_REF_4119Hap2 --draw
 
-#convert to v1.1 gfa to v1.0 gfa
-#vg convert -gfW Scaffold_10__1_contigs__length_74320458.gfa -t 30 > Scaffold_10__1_contigs__length_74320458_1.0.gfa
-#or confert .vg to gfa
+#or confert .vg to v1.0 gfa
 vg convert -f Scaffold_9__2_contigs__length_79556474.vg  -W > Scaffold_9__2_contigs__length_79556474.gfa
 
 #creat .og file
@@ -248,11 +246,22 @@ odgi build -g  Scaffold_9__2_contigs__length_79556474.gfa  -o Scaffold_9__2_cont
 # I didnt change the max number of iterations here (default 30) but I could using -x
 odgi sort -i Scaffold_9__2_contigs__length_79556474.og --threads 20 -P -C /scratch/general/nfs1/u6071015/odgi -o Scaffold_9__2_contigs__length_79556474_sorted.og
 
-#visualize sorted graph 
-odgi viz -i Scaffold_9__2_contigs__length_79556474_sorted.og -o Scaffold_9__2_contigs__length_79556474_sorted.svg -x 5000
+#visualize sorted graph (this creates a png that is too big to view)
+odgi viz -i Scaffold_9__2_contigs__length_79556474_sorted.og -o Scaffold_9__2_contigs__length_79556474_sorted.svg -x 5000 -y 2000
 
 #Create a 2D layout (using unsorted graph)
-odgi layout -i Scaffold_10__1_contigs__length_74320458.og -o Scaffold_10__1_contigs__length_74320458.lay -P --threads 20
+odgi layout -i Scaffold_9__2_contigs__length_79556474_sorted.og -o Scaffold_9__2_contigs__length_79556474_sorted.lay -P --threads 20 --optimize
+
+#maybe if I provide the layout file it will work
+odgi viz \
+    -i Scaffold_9__2_contigs__length_79556474_sorted.og \
+    -c Scaffold_9__2_contigs__length_79556474_sorted.lay \
+    -o Scaffold_9__2_contigs__length_79556474_sorted.png \
+    -x 4000 \
+    -y 1500 \
+    --border 10 \
+    --gap 0 \
+    -p
 
 #draw 2d layouts, requires index and coords file (coords made in layout command)
 odgi draw -i Scaffold_10__1_contigs__length_74320458_sorted.og -c Scaffold_10__1_contigs__length_74320458.lay -p HScaffold_10__1_contigs__length_74320458.lay.png -C -w 50
