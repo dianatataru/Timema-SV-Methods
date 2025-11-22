@@ -219,28 +219,19 @@ mamba install -c bioconda vg
 
 need to convert .vg to .gfa file to .og format. Sorting in OG format will also help with the complexity found in the current .viz graphs. If we want to make the loopy line plots, my understanding is that you have to do the following. Note, you have to run this chromosome by chromsome. I went into the chrom_alignments folder and moved older alignments into old_alignments subdirectory to run all of this on the HWY154_4119Hap2 reference with all 8 genomes. 
 
+Messing around with cactus outoput files:
 ```
 #start interactive job
 salloc --time=06:00:00 --ntasks 24 --nodes=1 --account=gompert-kp --partition=gompert-kp --mem=100G
 
 module load miniforge3
 conda activate odgi
-module load cactus/3.0.1
-
-cactus-graphmap-join /scratch/general/nfs1/u6071015/cactusNp/timema/timema8hapJS \
-   --vg /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus/chrom-alignments/*.vg \
-   --reference Hap2_t_crist_hwy154_cen4119 \
-   --outDir /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus/HWY154_REF_4119Hap2/chroms \
-   --outName HWY154_REF_4119Hap2 --draw
 
 #or confert .vg to v1.0 gfa
 vg convert -f Scaffold_9__2_contigs__length_79556474.vg  -W > Scaffold_9__2_contigs__length_79556474.gfa
 
 #creat .og file
 odgi build -g  Scaffold_9__2_contigs__length_79556474.gfa  -o Scaffold_9__2_contigs__length_79556474.og
-
-#make temp dir
-#mkdir /scratch/general/nfs1/u6071015/odgi
 
 #sort .og file (-Y selects the PG-SGD algorithm for sorting, many options to tweak this)
 # I didnt change the max number of iterations here (default 30) but I could using -x
@@ -249,27 +240,11 @@ odgi sort -i Scaffold_9__2_contigs__length_79556474.og --threads 20 -P -C /scrat
 #visualize sorted graph (this creates a png that is too big to view)
 odgi viz -i Scaffold_9__2_contigs__length_79556474_sorted.og -o Scaffold_9__2_contigs__length_79556474_sorted.svg -x 5000 -y 2000
 
-#Create a 2D layout (using unsorted graph)
-odgi layout -i Scaffold_9__2_contigs__length_79556474_sorted.og -o Scaffold_9__2_contigs__length_79556474_sorted.lay -P --threads 20 
-
-#maybe if I provide the layout file it will work
-odgi viz \
-    -i Scaffold_9__2_contigs__length_79556474_sorted.og \
-    -c Scaffold_9__2_contigs__length_79556474_sorted.lay \
-    -o Scaffold_9__2_contigs__length_79556474_sorted.png \
-    -x 4000 \
-    -y 1500 \
-    --border 10 \
-    --gap 0 \
-    -p
-
-#draw 2d layouts, requires index and coords file (coords made in layout command)
-odgi draw -i Scaffold_10__1_contigs__length_74320458_sorted.og -c Scaffold_10__1_contigs__length_74320458.lay -p HScaffold_10__1_contigs__length_74320458.lay.png -C -w 50
-
 #SV calling with vg
 vg snarls Scaffold_10__2_contigs__length_75648701.vg > Scaffold_10__2_contigs__length_75648701.snarls
 
 ```
+Making the loopy odgi draw graphs with odgi_draw.sh:
 ```
 #!/bin/bash 
 #SBATCH --time=240:00:00
@@ -289,3 +264,38 @@ cactus-graphmap-join /scratch/general/nfs1/u6071015/cactusNp/timema/timema8hapJS
    --reference Hap2_t_crist_hwy154_cen4119 \
    --outDir /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus/HWY154_REF_4119Hap2/chroms \
    --outName HWY154_REF_4119Hap2 --draw
+
+```
+making the sorted viz graphs (hopefully less paths, more interpretable) with run_odgi_viz.sh:
+
+```
+#!/bin/bash 
+#SBATCH --time=240:00:00
+#SBATCH --nodes=1
+#SBATCH -n 24
+#SBATCH --mem=100G
+#SBATCH --account=gompert-kp
+#SBATCH --partition=gompert-kp
+#SBATCH --job-name=odgi-viz
+#SBATCH -e odgi-viz-%j.err
+#SBATCH -o odgi-viz-%j.out
+
+module load miniforge3
+conda activate odgi
+
+cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus/chrom-alignments
+
+odgi sort -i Scaffold_9__2_contigs__length_79556474.og --threads 20 -P -C /scratch/general/nfs1/u6071015/odgi -o Scaffold_9__2_contigs__length_79556474_sorted.og
+
+odgi layout -i Scaffold_9__2_contigs__length_79556474_sorted.og -o Scaffold_9__2_contigs__length_79556474_sorted.lay -P --threads 20 
+
+odgi viz \
+    -i Scaffold_9__2_contigs__length_79556474_sorted.og \
+    -c Scaffold_9__2_contigs__length_79556474_sorted.lay \
+    -o Scaffold_9__2_contigs__length_79556474_sorted.png \
+    -x 4000 \
+    -y 1500 \
+    --border 10 \
+    --gap 0 \
+    -p
+```
