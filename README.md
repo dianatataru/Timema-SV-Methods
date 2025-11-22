@@ -250,7 +250,7 @@ odgi sort -i Scaffold_9__2_contigs__length_79556474.og --threads 20 -P -C /scrat
 odgi viz -i Scaffold_9__2_contigs__length_79556474_sorted.og -o Scaffold_9__2_contigs__length_79556474_sorted.svg -x 5000 -y 2000
 
 #Create a 2D layout (using unsorted graph)
-odgi layout -i Scaffold_9__2_contigs__length_79556474_sorted.og -o Scaffold_9__2_contigs__length_79556474_sorted.lay -P --threads 20 --optimize
+odgi layout -i Scaffold_9__2_contigs__length_79556474_sorted.og -o Scaffold_9__2_contigs__length_79556474_sorted.lay -P --threads 20 
 
 #maybe if I provide the layout file it will work
 odgi viz \
@@ -265,6 +265,10 @@ odgi viz \
 
 #draw 2d layouts, requires index and coords file (coords made in layout command)
 odgi draw -i Scaffold_10__1_contigs__length_74320458_sorted.og -c Scaffold_10__1_contigs__length_74320458.lay -p HScaffold_10__1_contigs__length_74320458.lay.png -C -w 50
+
+#SV calling with vg
+vg snarls Scaffold_10__2_contigs__length_75648701.vg > Scaffold_10__2_contigs__length_75648701.snarls
+
 ```
 ```
 #!/bin/bash 
