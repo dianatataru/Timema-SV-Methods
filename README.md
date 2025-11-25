@@ -1,5 +1,5 @@
 # Timema-SV-Methods
-Identifying how different methods of structural variant (SV) detection identify SVs, and whether Does SV size, frequency, or age have an effect on SV detection in different methods? Using data from this Gompert et al. 2025 (https://www.science.org/doi/10.1126/science.adp3745), and specifically focused on inversions and translocations.
+Identifying how different methods of structural variant (SV) detection identify SVs, and whether Does SV size, frequency, or age have an effect on SV detection in different methods? Using data from this Gompert et al. 2025 (https://www.science.org/doi/10.1126/science.adp3745), and specifically focused on inversions and translocations. Here is some helpful background on pangenomics: https://pangenome.github.io/
 
 ## Pangenome Creation
 Starting off with making pangenomes with 1) 4 hwy154 genomes and 2) 8 genomes (4 hwy154 and 4 refugio) in cactus minigraph (paper:https://www.nature.com/articles/s41587-023-01793-w, documentation: https://github.com/ComparativeGenomicsToolkit/cactus/blob/master/doc/pangenome.md).
@@ -243,6 +243,13 @@ odgi viz -i Scaffold_9__2_contigs__length_79556474_sorted.og -o Scaffold_9__2_co
 #SV calling with vg
 vg snarls Scaffold_10__2_contigs__length_75648701.vg > Scaffold_10__2_contigs__length_75648701.snarls
 
+#this hasn't resulted in any sort of interpretable output, now following some of the analysis in here: https://cpang.netlify.app/post/day-3-bacterial-pangenomics/
+#index in vg
+vg index -x Scaffold_9__2_contigs__length_79556474.xg Scaffold_9__2_contigs__length_79556474.vg
+
+#visualize in vg
+vg viz -x Scaffold_9__2_contigs__length_79556474.xg -o Scaffold_9__2_contigs__length_79556474.svg
+
 ```
 Making the loopy odgi draw graphs with odgi_draw.sh:
 ```
@@ -283,19 +290,20 @@ making the sorted viz graphs (hopefully less paths, more interpretable) with run
 module load miniforge3
 conda activate odgi
 
-cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus/chrom-alignments
+WORKDIR="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus/chrom-alignments"
+SCAFFOLD="Scaffold_4__1_contigs__length_97222829"
 
-odgi sort -i Scaffold_9__2_contigs__length_79556474.og --threads 20 -P -C /scratch/general/nfs1/u6071015/odgi -o Scaffold_9__2_contigs__length_79556474_sorted.og
+cd $WORKDIR
 
-odgi layout -i Scaffold_9__2_contigs__length_79556474_sorted.og -o Scaffold_9__2_contigs__length_79556474_sorted.lay -P --threads 20 
+#odgi build -g ${SCAFFOLD}.gfa  -o ${SCAFFOLD}.og -O
+
+odgi sort -i ${SCAFFOLD}.og --threads 20 -P -Y -C /scratch/general/nfs1/u6071015/odgi -o ${SCAFFOLD}_sortedPGSGD.og
+
+#odgi layout -i ${SCAFFOLD}_sorted.og -o ${SCAFFOLD}_sorted.lay -P --threads 20 
 
 odgi viz \
-    -i Scaffold_9__2_contigs__length_79556474_sorted.og \
-    -c Scaffold_9__2_contigs__length_79556474_sorted.lay \
-    -o Scaffold_9__2_contigs__length_79556474_sorted.png \
+    -i ${SCAFFOLD}_sortedPGSGD.og \
+    -o ${SCAFFOLD}_sortedPGSGD.png \
     -x 4000 \
-    -y 1500 \
-    --border 10 \
-    --gap 0 \
-    -p
+    -y 1500 
 ```
