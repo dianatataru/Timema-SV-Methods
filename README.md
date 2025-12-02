@@ -307,3 +307,71 @@ odgi viz \
     -x 4000 \
     -y 1500 
 ```
+
+
+### Using Pantree to describe SVs
+Following this preprint: https://www.biorxiv.org/content/10.1101/2025.08.04.668502v1
+
+```
+pwd /uufs/chpc.utah.edu/common/home/u6071015/software
+module load miniforge3
+conda activate odgi
+conda install pip
+pip install uv
+git clone ssh:://git@github.com/oclb/graph_var.git
+cd graph_var
+uv venv
+#Using CPython 3.13.9
+#Creating virtual environment at: .venv
+#Activate with: source .venv/bin/activate
+uv sync
+# Built pantree @ file:///uufs/chpc.utah.edu/common/home/u6071015/software/pantree
+```
+Okay, so now I am going to move to the /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree folder and write the python script from github and and sbatch script to run it. Here is the python script, which I will call pantree_config.py
+
+```
+from graph_var import PangenomeGraph
+
+# Read a .gfa file
+gfa_path = "/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus/HWY154_REF_4119Hap2/HWY154_REF_4119Hap2.gfa"
+reference_path_index = 1
+G, walks, walk_sample_names = PangenomeGraph.from_gfa(gfa_path, 
+                                                return_walks=True, compressed=False, 
+                                                reference_path_index=reference_path_index)
+
+# Generate vcf file
+vcf_path = "/uufs/chpc.utah.edu/common/home/u6071015/software/pantree/HWY154_REF_4119Hap2_pantree.vcf"
+chr_id = "all"
+G.write_vcf(gfa_path, vcf_path, chr_id)
+
+# Enumerate variants of different types
+edge_type_count: dict = G.variant_edges_summary()
+
+# Get the genotype of a walk, then reconstruct edge visit counts
+genotype: dict = G.genotype(walks[0])
+edge_visit_counts: dict = G.count_edge_visits(genotype)
+
+```
+and here is the sbatch script to run the python script, which I will call run_pantree.sh:
+```
+#!/bin/bash
+#SBATCH --time=72:00:00
+#SBATCH --nodes=1
+#SBATCH -n 24
+#SBATCH --mem=100G
+#SBATCH --account=gompert-kp
+#SBATCH --partition=gompert-kp
+#SBATCH --job-name=pantree
+#SBATCH -e pantree-%j.err
+#SBATCH -o pantree-%j.out
+
+module load miniforge3
+conda activate odgi
+cd /uufs/chpc.utah.edu/common/home/u6071015/software/pantree/graph_var
+source .venv/bin/activate
+
+# Run pantree
+python /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/pantree_config.py
+
+```
+
