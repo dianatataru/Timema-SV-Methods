@@ -315,8 +315,6 @@ Following this preprint: https://www.biorxiv.org/content/10.1101/2025.08.04.6685
 ```
 pwd /uufs/chpc.utah.edu/common/home/u6071015/software
 module load miniforge3
-conda activate odgi
-conda install pip
 pip install uv
 git clone ssh:://git@github.com/oclb/graph_var.git
 cd graph_var
@@ -326,6 +324,11 @@ uv venv
 #Activate with: source .venv/bin/activate
 uv sync
 # Built pantree @ file:///uufs/chpc.utah.edu/common/home/u6071015/software/pantree
+#a few modules missing fomr the sync
+pip install networkx
+pip install numpy
+pip install uv
+pip instal psutil
 ```
 Okay, so now I am going to move to the /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree folder and write the python script from github and and sbatch script to run it. Here is the python script, which I will call pantree_config.py
 
@@ -333,15 +336,15 @@ Okay, so now I am going to move to the /uufs/chpc.utah.edu/common/home/gompert-g
 from graph_var import PangenomeGraph
 
 # Read a .gfa file
-gfa_path = "/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus/HWY154_REF_4119Hap2/HWY154_REF_4119Hap2.gfa"
-reference_path_index = 1
-G, walks, walk_sample_names = PangenomeGraph.from_gfa(gfa_path, 
-                                                return_walks=True, compressed=False, 
-                                                reference_path_index=reference_path_index)
+gfa_path = "/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus/chrom-alignments/Scaffold_12__1_contigs__length_47609450.gfa "
+#reference_path_index = 1
+G, walks, walk_sample_names = PangenomeGraph.from_gfa_line_by_line(gfa_path, 
+                                                return_walks=True, ref_name="Hap2_t_crist_hwy154_cen4119.2")
+                                                #reference_path_index=reference_path_index)
 
 # Generate vcf file
-vcf_path = "/uufs/chpc.utah.edu/common/home/u6071015/software/pantree/HWY154_REF_4119Hap2_pantree.vcf"
-chr_id = "all"
+vcf_path = "/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/HWY154_REF_4119Hap2_pantree.vcf"
+chr_id = "Scaffold_12"
 G.write_vcf(gfa_path, vcf_path, chr_id)
 
 # Enumerate variants of different types
@@ -366,9 +369,9 @@ and here is the sbatch script to run the python script, which I will call run_pa
 #SBATCH -o pantree-%j.out
 
 module load miniforge3
-conda activate odgi
 cd /uufs/chpc.utah.edu/common/home/u6071015/software/pantree/graph_var
 source .venv/bin/activate
+export PYTHONPATH="/uufs/chpc.utah.edu/common/home/u6071015/software/pantree:${PYTHONPATH}"
 
 # Run pantree
 python /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/pantree_config.py
