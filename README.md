@@ -378,3 +378,40 @@ python /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/
 
 ```
 
+## Pairwise comparison in Progressive Cactus
+
+We are also going to call SVs from the pairwise comparisons, specifically focusing on comparisons between the reference haplotype used for the pangenome (HWY154 Stripe Haplotype2) and the other haplotypes. For this, I am creating softlinks in ''/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus'' to existing hal files, and need to make the hal file for H154 Stripe 2/Refugio Stripe 1 pair. ti do so, I run the script run_cactus.sh in the directory. The script also requires input file cactusTcrGSH2_TcrGSR1.txt
+
+```
+(TcrGSH2:0.010,TcrGSR1:0.010);
+
+TcrGSH2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap2.fasta.masked
+TcrGSR1 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_refug_cen4122_hap1.fasta.masked
+```
+
+```
+#!/bin/sh 
+#SBATCH --time=240:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=24
+#SBATCH --account=gompert
+#SBATCH --partition=gompert-grn
+#SBATCH --job-name=cactus
+#SBATCH --qos gompert-grn
+#SBATCH -e cactus-%j.err
+#SBATCH -o cactus-%j.out
+
+cd /scratch/general/nfs1/u6071015/cactusNp
+
+module load cactus/1.0.0
+
+cactus timemajobStore /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusTcrGSH2_TcrGSR1.txt cactusStripe_TcrGSH2_TcrGSR1.hal --maxCores 80
+
+cp /scratch/general/nfs1/cactusNp/cactusStripe_TcrGSH2_TcrGSR1.hal /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusStripe_TcrGSH2_TcrGSR1.hal
+
+cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus
+
+#Summarize Mutations
+halSummarizeMutations *.hal
+```
+
