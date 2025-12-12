@@ -400,6 +400,7 @@ TcrGSR1 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods
 #SBATCH --qos gompert-grn
 #SBATCH -e cactus-%j.err
 #SBATCH -o cactus-%j.out
+#SBATCH --mem=100G
 
 cd /scratch/general/nfs1/u6071015/cactusNp
 
@@ -407,11 +408,17 @@ module load cactus/1.0.0
 
 cactus timemajobStore /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusTcrGSH2_TcrGSR1.txt cactusStripe_TcrGSH2_TcrGSR1.hal --maxCores 80
 
-cp /scratch/general/nfs1/cactusNp/cactusStripe_TcrGSH2_TcrGSR1.hal /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusStripe_TcrGSH2_TcrGSR1.hal
+cp /scratch/general/nfs1/u6071015/cactusNp/cactusStripe_TcrGSH2_TcrGSR1.hal /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusStripe_TcrGSH2_TcrGSR1.hal
 
 cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus
 
-#Summarize Mutations
-halSummarizeMutations *.hal
+#Summarize Mutations 
+halSummarizeMutations cactusStripe_TcrGSH1_TcrGSH2.hal
+halSummarizeMutations cactusStripe_TcrGSH2_TcrGUSH1.hal
+halSummarizeMutations cactusStripe_TcrGSH2_TcrGUSR2.hal
+halSummarizeMutations cactusStripe_TcrGSH2_TcrGSR1.hal
+halSummarizeMutations cactusStripe_TcrGSH2_TcrGUSH2.hal  
+halSummarizeMutations cactusStripe_TcrGSH2_TcrGSR2.hal
+halSummarizeMutations cactusStripe_TcrGSH2_TcrGUSR1.hal
 ```
 
