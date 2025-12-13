@@ -380,7 +380,7 @@ python /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/
 
 ## Pairwise comparison in Progressive Cactus
 
-We are also going to call SVs from the pairwise comparisons, specifically focusing on comparisons between the reference haplotype used for the pangenome (HWY154 Stripe Haplotype2) and the other haplotypes. For this, I am creating softlinks in ''/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus'' to existing hal files, and need to make the hal file for H154 Stripe 2/Refugio Stripe 1 pair. ti do so, I run the script run_cactus.sh in the directory. The script also requires input file cactusTcrGSH2_TcrGSR1.txt
+We are also going to call SVs from the pairwise comparisons, specifically focusing on comparisons between the reference haplotype used for the pangenome (HWY154 Stripe Haplotype2) and the other haplotypes. For this, I am creating softlinks in ''/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus'' to existing hal files, and need to make the hal file for H154 Stripe 2/Refugio Stripe 1 pair. TO do so, I run the script run_cactus.sh in the directory. The script also requires input file cactusTcrGSH2_TcrGSR1.txt:
 
 ```
 (TcrGSH2:0.010,TcrGSR1:0.010);
@@ -388,7 +388,7 @@ We are also going to call SVs from the pairwise comparisons, specifically focusi
 TcrGSH2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap2.fasta.masked
 TcrGSR1 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_refug_cen4122_hap1.fasta.masked
 ```
-
+run_cactus.sh:
 ```
 #!/bin/sh 
 #SBATCH --time=240:00:00
@@ -406,9 +406,15 @@ cd /scratch/general/nfs1/u6071015/cactusNp
 
 module load cactus/1.0.0
 
+#missing pair
 cactus timemajobStore /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusTcrGSH2_TcrGSR1.txt cactusStripe_TcrGSH2_TcrGSR1.hal --maxCores 80
 
 cp /scratch/general/nfs1/u6071015/cactusNp/cactusStripe_TcrGSH2_TcrGSR1.hal /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusStripe_TcrGSH2_TcrGSR1.hal
+
+#test rerun
+cactus timemajobStore_TcrGSH2_TcrGUSH2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusTcrGSH2_TcrGUSH2.txt cactusStripe_TcrGSH2_TcrGUSH2_DT.hal --maxCores 80
+
+cp /scratch/general/nfs1/u6071015/cactusNp/cactusStripe_TcrGSH2_TcrGUSH2_DT.hal /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusStripe_TcrGSH2_TcrGUSH2_DT.hal
 
 cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus
 
@@ -420,5 +426,12 @@ halSummarizeMutations cactusStripe_TcrGSH2_TcrGSR1.hal
 halSummarizeMutations cactusStripe_TcrGSH2_TcrGUSH2.hal  
 halSummarizeMutations cactusStripe_TcrGSH2_TcrGSR2.hal
 halSummarizeMutations cactusStripe_TcrGSH2_TcrGUSR1.hal
+halSummarizeMutations cactusStripe_TcrGSH2_TcrGUSH2_DT.hal 
 ```
+The output of this ended up with way too many inversions called for my new .hal file (https://docs.google.com/spreadsheets/d/1BqMnLqLyoLgIq9Shhy4W0GRIvbQmTF1AU8gqI19ijA0/edit?gid=0#gid=0), on the scale of 150-250 inversions instead of the normal 5-20 for the existing .hal files. I am re-running this on a species pair that already has a .hal file to see if it comes up with a similar number to the existing file, to see if it is an issue with my commands or with the files. 
 
+halSummarizeMutations also doesn't come up with identifiers for mutations, so what I really need is a SV caller that develops position/reference-specific (?) identifiers so that I can then tell how many are unique across the pairwise comparisons. The trick is to do this without accidentally just creating another pangenome... it seems like vg might have a way of calling SVs, which would be ideal because I think we are also going to use vg's giraffe-deepvariant workflow for sv calling for GBS data.
+
+## GBS Data Alignment and Variant Calling from Pangenome
+
+We use the Giraffe-DeepVariant workflows to align and call SVs from the GSH2-8haplotype pangenome (https://www.science.org/doi/epdf/10.1126/science.abg8871, https://github.com/vgteam/vg_wdl?tab=readme-ov-file#giraffe-deepvariant-workflow).
