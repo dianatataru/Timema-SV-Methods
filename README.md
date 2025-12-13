@@ -430,8 +430,18 @@ halSummarizeMutations cactusStripe_TcrGSH2_TcrGUSH2_DT.hal
 ```
 The output of this ended up with way too many inversions called for my new .hal file (https://docs.google.com/spreadsheets/d/1BqMnLqLyoLgIq9Shhy4W0GRIvbQmTF1AU8gqI19ijA0/edit?gid=0#gid=0), on the scale of 150-250 inversions instead of the normal 5-20 for the existing .hal files. I am re-running this on a species pair that already has a .hal file to see if it comes up with a similar number to the existing file, to see if it is an issue with my commands or with the files. 
 
-halSummarizeMutations also doesn't come up with identifiers for mutations, so what I really need is a SV caller that develops position/reference-specific (?) identifiers so that I can then tell how many are unique across the pairwise comparisons. The trick is to do this without accidentally just creating another pangenome... it seems like vg might have a way of calling SVs, which would be ideal because I think we are also going to use vg's giraffe-deepvariant workflow for sv calling for GBS data.
+halSummarizeMutations also doesn't come up with identifiers for mutations, so what I really need is a SV caller that develops position/reference-specific (?) identifiers so that I can then tell how many are unique across the pairwise comparisons. The trick is to do this without accidentally just creating another pangenome... it seems like vg might have a way of calling SVs, which would be ideal because I think we are also going to use vg's giraffe-deepvariant workflow for sv calling for GBS data. Also, it seems rigorous compared to other SV callers (Hickey et al. Genome Biology (2020) https://doi.org/10.1186/s13059-020-1941-7).
+
+You can convert hal to vg using ```hal2vg input.hal --inMemory --chop 32 --progress --refGenome > output.vg``` and then something like 
+```
+vg pack
+vg call <graph.xg>-k <graph.pack>-v variants.vcf.gz
+```?
 
 ## GBS Data Alignment and Variant Calling from Pangenome
 
 We use the Giraffe-DeepVariant workflows to align and call SVs from the GSH2-8haplotype pangenome (https://www.science.org/doi/epdf/10.1126/science.abg8871, https://github.com/vgteam/vg_wdl?tab=readme-ov-file#giraffe-deepvariant-workflow).
+
+## Comparison across methods
+
+To compare the success of calling across methods, we can use sveval (https://github.com/jmonlong/sveval) with vcfs from each method.
