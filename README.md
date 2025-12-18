@@ -436,7 +436,8 @@ You can convert hal to vg using ```hal2vg input.hal --inMemory --chop 32 --progr
 ```
 vg pack
 vg call <graph.xg>-k <graph.pack>-v variants.vcf.gz
-```?
+```
+Another option is to use Sniffles2 (used in Zhang et al. 2025). For this we can use halLiftover with the .bed files for each genome (do these exist?) to create a .bed file that can be input into Sniffles. Zhang et al. 2025 then use survivor (https://www.github.com/fritzsedlazeck/SURVIVOR; version 1.0.3) (Jeffares et al., 2017) to identify homologous 
 
 ## GBS Data Alignment and Variant Calling from Pangenome
 
