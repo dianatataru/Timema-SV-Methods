@@ -434,6 +434,9 @@ halSummarizeMutations also doesn't come up with identifiers for mutations, so wh
 
 You can convert hal to vg using ```hal2vg input.hal --inMemory --chop 32 --progress --refGenome > output.vg``` and then something like 
 ```
+salloc --time=06:00:00 --ntasks 12 --nodes=1 --account=gompert-np --partition=gompert-np 
+module load cactus/2.7.2
+hal2vg input.hal --inMemory --chop 32 --progress --refGenome > output.vg
 vg pack
 vg call <graph.xg>-k <graph.pack>-v variants.vcf.gz
 ```
