@@ -416,6 +416,21 @@ cactus timemajobStore_TcrGSH2_TcrGUSH2 /uufs/chpc.utah.edu/common/home/gompert-g
 
 cp /scratch/general/nfs1/u6071015/cactusNp/cactusStripe_TcrGSH2_TcrGUSH2_DT.hal /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusStripe_TcrGSH2_TcrGUSH2_DT.hal
 
+module purge
+module load cactus/2.7.2
+#now running with new cactus version
+cactus timemajobStore_TcrGSH2_TcrGSR1v2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusTcrGSH2_TcrGSR1.txt cactusStripe_TcrGSH2_TcrGSR1_DTv2.hal --maxCores 80
+
+cactus timemajobStore_TcrGSH2_TcrGSR2v2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusTcrGSH2_TcrGSR2.txt cactusStripe_TcrGSH2_TcrGSR2_DTv2.hal --maxCores 80
+
+cactus timemajobStore_TcrGSH2_TcrGSH1v2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusTcrGSH2_TcrGSH1.txt cactusStripe_TcrGSH2_TcrGSH1_DTv2.hal --maxCores 80
+
+cactus timemajobStore_TcrGSH2_TcrGUSR1v2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusTcrGSH2_TcrGUSR1.txt cactusStripe_TcrGSH2_TcrGUSR1_DTv2.hal --maxCores 80
+
+cactus timemajobStore_TcrGSH2_TcrGUSR2v2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusTcrGSH2_TcrGUSR2.txt cactusStripe_TcrGSH2_TcrGUSR2_DTv2.hal --maxCores 80
+
+cp /scratch/general/nfs1/u6071015/cactusNp/*_DTv2.hal /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/
+
 cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus
 
 #Summarize Mutations 
@@ -434,13 +449,35 @@ halSummarizeMutations also doesn't come up with identifiers for mutations, so wh
 
 You can convert hal to vg using ```hal2vg input.hal --inMemory --chop 32 --progress --refGenome > output.vg``` and then something like 
 ```
-salloc --time=06:00:00 --ntasks 12 --nodes=1 --account=gompert-np --partition=gompert-np 
+salloc --time=06:00:00 --ntasks 12 --nodes=1 --account=gompert --partition=gompert-grn --qos gompert-grn --mem=200G
 module load cactus/2.7.2
-hal2vg input.hal --inMemory --chop 32 --progress --refGenome > output.vg
-vg pack
-vg call <graph.xg>-k <graph.pack>-v variants.vcf.gz
+cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus
+
+hal2vg cactusStripe_TcrGSH2_TcrGUSH2_DTv2.hal --hdf5InMemory --chop 32 --progress > cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg
+vg index cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg -x cactusStripe_TcrGSH2_TcrGUSH2_DTv2.xg -L
+vg snarls cactusStripe_TcrGSH2_TcrGUSH2_DTv2.xg > cactusStripe_TcrGSH2_TcrGUSH2_DTv2.snarls
+vg view -j -R cactusStripe_TcrGSH2_TcrGUSH2_DTv2.snarls > cactusStripe_TcrGSH2_TcrGUSH2_DTv2.snarls.json
+wc -l cactusStripe_TcrGSH2_TcrGUSH2_DTv2.snarls.json
+#14234556 cactusStripe_TcrGSH2_TcrGUSH2_DTv2.snarls.json
+
+vg deconstruct cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg -P TcrGSH2 -e -a > cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vcf
+bgzip cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vcf
+tabix cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vcf.gz
+
+module load bcftools
+# subset to SVs greater than 0 bp, throws up error about GT but just rempves it
+bcftools view -i 'strlen(REF)>50 || strlen(ALT)>50' \
+    cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vcf.gz -G -Oz -o cactusStripe_TcrGSH2_TcrGUSH2_min50bp.vcf.gz
+tabix -p vcf cactusStripe_TcrGSH2_TcrGUSH2_min50bp.vcf.gz
+bcftool stats cactusStripe_TcrGSH2_TcrGUSH2_min50bp.vcf.gz # number of records is 819, I think this is missing inversions
+
 ```
-Another option is to use Sniffles2 (used in Zhang et al. 2025). For this we can use halLiftover with the .bed files for each genome (do these exist?) to create a .bed file that can be input into Sniffles. Zhang et al. 2025 then use survivor (https://www.github.com/fritzsedlazeck/SURVIVOR; version 1.0.3) (Jeffares et al., 2017) to identify homologous 
+GSH2 is the REF for all. Translocations are a little trickier than inversions, I will want to filter by breakpoints (BND) that have more than one path supporting them (INFO/NS > 1), and then by ones that are mate-paired (collapse these into single record). Once I have a pairwise vcf for each combinations, I can use bcf tools merge to merge across all pairwise comparisons to get a total number. 
+
+New Jay paper does the following with vg deconstruct vcf output:
+- ran vcfbub to keep only top-level cariant sites (snarls) less than 100 kb in size
+- used vcfwave to realign REF and ALT alleles to split nested alleles to separate entries and identify inversions >1kb
+- combined vcf files with bcftools concat, added in missing sample coolumns with bcftools query, and used bcftools fixploidy to set allele number for every site and bcftools fill tags to add AF and AC for each each site. Also used bcftools norm to split multiallelic to biallelic
 
 ## GBS Data Alignment and Variant Calling from Pangenome
 
@@ -448,4 +485,4 @@ We use the Giraffe-DeepVariant workflows to align and call SVs from the GSH2-8ha
 
 ## Comparison across methods
 
-To compare the success of calling across methods, we can use sveval (https://github.com/jmonlong/sveval) with vcfs from each method.
+To compare the success of calling across methods, we can use sveval (https://github.com/jmonlong/sveval) with vcfs from each method, or Zhang et al. 2025 then use survivor (https://www.github.com/fritzsedlazeck/SURVIVOR; version 1.0.3) (Jeffares et al., 2017) to identify homologous SV.
