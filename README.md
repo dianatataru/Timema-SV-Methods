@@ -369,14 +369,18 @@ and here is the sbatch script to run the python script, which I will call run_pa
 #SBATCH -o pantree-%j.out
 
 module load miniforge3
-cd /uufs/chpc.utah.edu/common/home/u6071015/software/pantree/graph_var
+cd /uufs/chpc.utah.edu/common/home/u6071015/software/pantree
 source .venv/bin/activate
 export PYTHONPATH="/uufs/chpc.utah.edu/common/home/u6071015/software/pantree:${PYTHONPATH}"
 
-# Run pantree
+# Run pantree (NEW)
+uv run pantree /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus/chrom-alignments/Scaffold_4__1_contigs__length_97222829.gfa /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/HWY154_REF_4119Hap2_pantree.vcf --ref-name Hap2_t_crist_hwy154_cen4119.2 --log-path /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/run1_scaff4.log --chr-id scaff4
+
+# Run pantree (OLD)
 python /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/pantree_config.py
 
 ```
+My old run timed out due to some bugs in the program. I changed the name of the old program to pantree_OLD and downloaded the updated program in /uufs/chpc.utah.edu/common/home/u6071015/software/pantree. It had an OOM killed event trying to run the entire genome
 
 ## Pairwise comparison in Progressive Cactus
 
@@ -475,7 +479,7 @@ bcftool stats cactusStripe_TcrGSH2_TcrGUSH2_min50bp.vcf.gz # number of records i
 GSH2 is the REF for all. Translocations are a little trickier than inversions, I will want to filter by breakpoints (BND) that have more than one path supporting them (INFO/NS > 1), and then by ones that are mate-paired (collapse these into single record). Once I have a pairwise vcf for each combinations, I can use bcf tools merge to merge across all pairwise comparisons to get a total number. 
 
 New Jay paper does the following with vg deconstruct vcf output:
-- ran vcfbub to keep only top-level cariant sites (snarls) less than 100 kb in size
+- ran vcfbub to keep only top-level variant sites (snarls) less than 100 kb in size
 - used vcfwave to realign REF and ALT alleles to split nested alleles to separate entries and identify inversions >1kb
 - combined vcf files with bcftools concat, added in missing sample coolumns with bcftools query, and used bcftools fixploidy to set allele number for every site and bcftools fill tags to add AF and AC for each each site. Also used bcftools norm to split multiallelic to biallelic
 
