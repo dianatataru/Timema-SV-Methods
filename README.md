@@ -365,23 +365,189 @@ and here is the sbatch script to run the python script, which I will call run_pa
 #SBATCH --account=gompert-kp
 #SBATCH --partition=gompert-kp
 #SBATCH --job-name=pantree
-#SBATCH -e pantree-%j.err
-#SBATCH -o pantree-%j.out
+#SBATCH -e /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/logs/pantree-%j.err
+#SBATCH -o /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/logs/pantree-%j.out
 
 module load miniforge3
 cd /uufs/chpc.utah.edu/common/home/u6071015/software/pantree
 source .venv/bin/activate
 export PYTHONPATH="/uufs/chpc.utah.edu/common/home/u6071015/software/pantree:${PYTHONPATH}"
 
-# Run pantree (NEW)
-uv run pantree /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus/chrom-alignments/Scaffold_4__1_contigs__length_97222829.gfa /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/HWY154_REF_4119Hap2_pantree.vcf --ref-name Hap2_t_crist_hwy154_cen4119.2 --log-path /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/run1_scaff4.log --chr-id scaff4
-
-# Run pantree (OLD)
-python /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/pantree_config.py
+# Run pantree 
+uv run pantree /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus/chrom-alignments/Scaffold_4__1_contigs__length_97222829.gfa /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/HWY154_REF_4119Hap2_pantree.vcf --ref-name Hap2_t_crist_hwy154_cen4119.2 --log-path /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/logs/run1_scaff4.log --chr-id scaff4
 
 ```
-My old run timed out due to some bugs in the program. I changed the name of the old program to pantree_OLD and downloaded the updated program in /uufs/chpc.utah.edu/common/home/u6071015/software/pantree. It had an OOM killed event trying to run the entire genome
+My old run timed out due to some bugs in the program. I changed the name of the old program to pantree_OLD and downloaded the updated program in /uufs/chpc.utah.edu/common/home/u6071015/software/pantree. It had an OOM killed event trying to run the entire genome, so I have to run it scaffold by scaffold.
 
+The output header of the pantree.vcf.gz looks like this:
+
+```
+##fileformat=VCFv4.2
+##source=pantree v0.2.0
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype: 1 if ALT is present, 0 if absent, . if missing">
+##FORMAT=<ID=CR,Number=R,Type=Integer,Description="Number of times visiting the REF allele">
+##FORMAT=<ID=CA,Number=A,Type=Integer,Description="Number of times visiting the ALT allele">
+##INFO=<ID=NR,Number=1,Type=String,Description="Non-reference allele">
+##INFO=<ID=VT,Number=1,Type=String,Description="Variant type">
+##INFO=<ID=TP,Number=1,Type=Integer,Description="Tree position of the variant edge's branch point">
+##INFO=<ID=RC,Number=1,Type=Integer,Description="The REF allele count">
+##INFO=<ID=AC,Number=A,Type=Integer,Description="The ALT allele count">
+##INFO=<ID=AN,Number=1,Type=Integer,Description="Total number of alleles in called genotypes">
+##INFO=<ID=HP,Number=.,Type=String,Description="Haplotype positions at reference tree edge (haplotype:position)">
+##INFO=<ID=TR_MOTIF,Number=1,Type=String,Description="Tandem repeat motif">
+##INFO=<ID=NIA,Number=1,Type=Integer,Description="Nearly identical alleles (1=yes, 0=no)">
+##INFO=<ID=UIDX,Number=1,Type=Integer,Description="Index of node u">
+```
+Now to summarize the output vcf using code from their paper (https://github.com/ShenghanZhang1123/graph_var_analysis/blob/main/notebooks/generating_data_analysis.ipynb) in a script I wrote called summarize_pantree_sv.py:
+
+```
+#!/usr/bin/env python
+
+import sys
+import os
+import gzip
+import pandas as pd
+from collections import defaultdict
+
+# Input
+
+vcf_path = sys.argv[1]
+
+base = os.path.basename(vcf_path)
+chrom = base.split("_pantree")[0]
+
+outdir = "summary"
+os.makedirs(outdir, exist_ok=True)
+
+# Containers
+
+count_by_type_linear = defaultdict(lambda: defaultdict(int))
+sizes_by_type = defaultdict(list)
+size_bins = defaultdict(lambda: {"<50bp": 0, ">=50bp": 0})
+
+# Open VCF (gz or plain)
+
+open_func = gzip.open if vcf_path.endswith(".gz") else open
+
+with open_func(vcf_path, "rt") as f:
+    for line in f:
+        if line.startswith("#"):
+            continue
+
+        fields = line.rstrip().split("\t")
+        pos = int(fields[1])
+        info = fields[7]
+
+        # Parse INFO into dict
+        info_dict = {}
+        for entry in info.split(";"):
+            if "=" in entry:
+                k, v = entry.split("=", 1)
+                info_dict[k] = v
+
+        # ---- Variant type
+        if "VT" not in info_dict:
+            continue
+        vt = info_dict["VT"]
+
+        # ---- Linear vs off-linear
+        # DR=ref,alt
+        if "DR" in info_dict:
+            try:
+                dr_ref, dr_alt = map(int, info_dict["DR"].split(","))
+                linear = dr_alt == 0
+            except ValueError:
+                linear = False
+        else:
+            linear = False
+
+        count_by_type_linear[vt]["Linear" if linear else "Off-linear"] += 1
+
+        # ---- Size
+        if "END" in info_dict:
+            try:
+                end = int(info_dict["END"])
+                size = abs(end - pos)
+
+                sizes_by_type[vt].append(size)
+
+                if size < 50:
+                    size_bins[vt]["<50bp"] += 1
+                else:
+                    size_bins[vt][">=50bp"] += 1
+            except ValueError:
+                pass
+
+# Output CSVs
+
+# Counts by type × linearity
+rows = []
+for vt, d in count_by_type_linear.items():
+    for lin, cnt in d.items():
+        rows.append({
+            "Variant_Type": vt,
+            "Linearity": lin,
+            "Count": cnt
+        })
+
+pd.DataFrame(rows).to_csv(
+    f"{outdir}/{chrom}_pantree_sv_counts_linear.csv",
+    index=False
+)
+
+# Mean size per type
+rows = []
+for vt, sizes in sizes_by_type.items():
+    if sizes:
+        rows.append({
+            "Variant_Type": vt,
+            "Mean_Size": sum(sizes) / len(sizes)
+        })
+
+pd.DataFrame(rows).to_csv(
+    f"{outdir}/{chrom}_pantree_sv_mean_size.csv",
+    index=False
+)
+
+# Size bins
+rows = []
+for vt, bins in size_bins.items():
+    rows.append({
+        "Variant_Type": vt,
+        "<50bp": bins["<50bp"],
+        ">=50bp": bins[">=50bp"]
+    })
+
+pd.DataFrame(rows).to_csv(
+    f"{outdir}/{chrom}_pantree_sv_size_bins.csv",
+    index=False
+)
+
+print(f"Pantree SV summary complete for {chrom}")
+
+```
+Run it using this sbatch script:
+
+```
+#!/bin/bash
+#SBATCH --time=72:00:00
+#SBATCH --nodes=1
+#SBATCH -n 24
+#SBATCH --account=gompert
+#SBATCH --partition=gompert-grn
+#SBATCH --qos gompert-grn
+#SBATCH --job-name=summarizepantree
+#SBATCH -e /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/logs/summarizepantree-%j.err
+#SBATCH -o /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/logs/summarizepantree-%j.out
+
+module load python
+
+SCAFF="Scaffold_12__1_contigs__length_47609450"
+
+#summarize SVs
+python summarize_pantree_sv.py ${SCAFF}_pantree.vcf.gz
+
+```
 ## Pairwise comparison in Progressive Cactus
 
 We are also going to call SVs from the pairwise comparisons, specifically focusing on comparisons between the reference haplotype used for the pangenome (HWY154 Stripe Haplotype2) and the other haplotypes. For this, I am creating softlinks in ''/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus'' to existing hal files, and need to make the hal file for H154 Stripe 2/Refugio Stripe 1 pair. TO do so, I run the script run_cactus.sh in the directory. The script also requires input file cactusTcrGSH2_TcrGSR1.txt:
