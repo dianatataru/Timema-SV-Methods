@@ -106,7 +106,7 @@ Got message from job at time 11-10-2025 17:18:07: Job used more disk than reques
 Finished after about 10 hours in interactive job.
 
 Quickly visualize output vg with tube map onlione demo:https://vgteam.github.io/sequenceTubeMap/. but the file has to be under 5 mb so subset or run on local computer.
-Possible analysis can be done in odgi: https://odgi.readthedocs.io/en/latest/
+
 
 ### Investigating Cactus Output
 
@@ -206,7 +206,7 @@ The .gbz gets mounted as the graph and haplotype, while the .gaf can be mounted 
 
 ### Using ODGI
 
-Downloaded using conda on kingspeak, because granite seems to not be working
+Downloaded using conda on kingspeak, because granite seems to not be working at this moment.
 
 ```
 module load miniforge3
@@ -324,37 +324,8 @@ uv venv
 #Activate with: source .venv/bin/activate
 uv sync
 # Built pantree @ file:///uufs/chpc.utah.edu/common/home/u6071015/software/pantree
-#a few modules missing fomr the sync
-pip install networkx
-pip install numpy
-pip install uv
-pip instal psutil
 ```
-Okay, so now I am going to move to the /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree folder and write the python script from github and and sbatch script to run it. Here is the python script, which I will call pantree_config.py
-
-```
-from graph_var import PangenomeGraph
-
-# Read a .gfa file
-gfa_path = "/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus/chrom-alignments/Scaffold_12__1_contigs__length_47609450.gfa "
-#reference_path_index = 1
-G, walks, walk_sample_names = PangenomeGraph.from_gfa_line_by_line(gfa_path, 
-                                                return_walks=True, ref_name="Hap2_t_crist_hwy154_cen4119.2")
-                                                #reference_path_index=reference_path_index)
-
-# Generate vcf file
-vcf_path = "/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/HWY154_REF_4119Hap2_pantree.vcf"
-chr_id = "Scaffold_12"
-G.write_vcf(gfa_path, vcf_path, chr_id)
-
-# Enumerate variants of different types
-edge_type_count: dict = G.variant_edges_summary()
-
-# Get the genotype of a walk, then reconstruct edge visit counts
-genotype: dict = G.genotype(walks[0])
-edge_visit_counts: dict = G.count_edge_visits(genotype)
-
-```
+Okay, so now I am going to move to the /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree folder
 and here is the sbatch script to run the python script, which I will call run_pantree.sh:
 ```
 #!/bin/bash
@@ -526,7 +497,7 @@ pd.DataFrame(rows).to_csv(
 print(f"Pantree SV summary complete for {chrom}")
 
 ```
-Run it using this sbatch script:
+Run it using this sbatch script, it outputs into the ```summary``` directory:
 
 ```
 #!/bin/bash
@@ -613,7 +584,7 @@ halSummarizeMutations cactusStripe_TcrGSH2_TcrGSR2.hal
 halSummarizeMutations cactusStripe_TcrGSH2_TcrGUSR1.hal
 halSummarizeMutations cactusStripe_TcrGSH2_TcrGUSH2_DT.hal 
 ```
-The output of this ended up with way too many inversions called for my new .hal file (https://docs.google.com/spreadsheets/d/1BqMnLqLyoLgIq9Shhy4W0GRIvbQmTF1AU8gqI19ijA0/edit?gid=0#gid=0), on the scale of 150-250 inversions instead of the normal 5-20 for the existing .hal files. I am re-running this on a species pair that already has a .hal file to see if it comes up with a similar number to the existing file, to see if it is an issue with my commands or with the files. 
+The output of this ended up with way too many inversions called for my new .hal file (https://docs.google.com/spreadsheets/d/1BqMnLqLyoLgIq9Shhy4W0GRIvbQmTF1AU8gqI19ijA0/edit?gid=0#gid=0), on the scale of 150-250 inversions instead of the normal 5-20 for the existing .hal files. This was because I used Cactus v1 instead of Cactus v2.7.2. I want to use Cactus v2.7.2, because it is better at calling SVs. There is still some slight differences on every cactus run between the same pairs, due to some randomness in the program.
 
 halSummarizeMutations also doesn't come up with identifiers for mutations, so what I really need is a SV caller that develops position/reference-specific (?) identifiers so that I can then tell how many are unique across the pairwise comparisons. The trick is to do this without accidentally just creating another pangenome... it seems like vg might have a way of calling SVs, which would be ideal because I think we are also going to use vg's giraffe-deepvariant workflow for sv calling for GBS data. Also, it seems rigorous compared to other SV callers (Hickey et al. Genome Biology (2020) https://doi.org/10.1186/s13059-020-1941-7).
 
@@ -642,7 +613,7 @@ tabix -p vcf cactusStripe_TcrGSH2_TcrGUSH2_min50bp.vcf.gz
 bcftool stats cactusStripe_TcrGSH2_TcrGUSH2_min50bp.vcf.gz # number of records is 819, I think this is missing inversions
 
 ```
-GSH2 is the REF for all. Translocations are a little trickier than inversions, I will want to filter by breakpoints (BND) that have more than one path supporting them (INFO/NS > 1), and then by ones that are mate-paired (collapse these into single record). Once I have a pairwise vcf for each combinations, I can use bcf tools merge to merge across all pairwise comparisons to get a total number. 
+GSH2 is the REF for all. 
 
 New Jay paper does the following with vg deconstruct vcf output:
 - ran vcfbub to keep only top-level variant sites (snarls) less than 100 kb in size
