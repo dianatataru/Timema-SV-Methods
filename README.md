@@ -519,6 +519,17 @@ SCAFF="Scaffold_12__1_contigs__length_47609450"
 python summarize_pantree_sv.py ${SCAFF}_pantree.vcf.gz
 
 ```
+
+To just output inversion vcf:
+
+```
+zcat Scaffold_12__1_contigs__length_47609450_pantree.vcf.gz \
+| awk '
+  /^#/ { print; next }
+  $8 ~ /(^|;)VT=INV(;|$)/
+' \
+| gzip > Scaffold_12__1_contigs__length_47609450_pantree_inversions_only.vcf.gz
+```
 ## Pairwise comparison in Progressive Cactus
 
 We are also going to call SVs from the pairwise comparisons, specifically focusing on comparisons between the reference haplotype used for the pangenome (HWY154 Stripe Haplotype2) and the other haplotypes. For this, I am creating softlinks in ''/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus'' to existing hal files, and need to make the hal file for H154 Stripe 2/Refugio Stripe 1 pair. TO do so, I run the script run_cactus.sh in the directory. The script also requires input file cactusTcrGSH2_TcrGSR1.txt:
