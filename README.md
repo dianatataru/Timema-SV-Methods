@@ -523,12 +523,13 @@ python summarize_pantree_sv.py ${SCAFF}_pantree.vcf.gz
 To just output inversion vcf:
 
 ```
-zcat Scaffold_12__1_contigs__length_47609450_pantree.vcf.gz \
+salloc --time=06:00:00 --ntasks 12 --nodes=1 --account=gompert --partition=gompert-grn --qos gompert-grn
+zcat Scaffold_9__2_contigs__length_79556474_pantree.vcf.gz \
 | awk '
   /^#/ { print; next }
   $8 ~ /(^|;)VT=INV(;|$)/
 ' \
-| gzip > Scaffold_12__1_contigs__length_47609450_pantree_inversions_only.vcf.gz
+| gzip > Scaffold_9__2_contigs__length_79556474_pantree_inversions_only.vcf.gz
 ```
 ## Pairwise comparison in Progressive Cactus
 
