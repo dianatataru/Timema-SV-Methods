@@ -171,7 +171,7 @@ Table S1: Homologous relationships among chromosome-size scaffolds for the T. cr
 genomes. Chromosome 13 is the X sex chromosome. Abbreviations are as follows: Chr = chromosome,
 U GS = unphased stripe genome from (82), R = Refugio, H = Hwy154, GS1 = striped
 haplotype 1, GS2 = striped haplotype 2, GUS1 = green haplotype 1, and GUS2 = green haplotype.
-4119, 4122=striped and 4120,4280=green
+4119, 4122=striped and 4120,4280=green. *reference for these analyses is H GS2*
 
 |Chr |U GS |R GS1 |R GS2 |R GUS1 |R GUS2 |H GS1 |H GS2 |H GUS1 |H GUS2|
 |----|-----|------|------|-------|------ |------|------|-------|------|
