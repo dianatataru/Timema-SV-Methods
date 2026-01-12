@@ -369,134 +369,8 @@ The output header of the pantree.vcf.gz looks like this:
 ##INFO=<ID=NIA,Number=1,Type=Integer,Description="Nearly identical alleles (1=yes, 0=no)">
 ##INFO=<ID=UIDX,Number=1,Type=Integer,Description="Index of node u">
 ```
-Now to summarize the output vcf using code from their paper (https://github.com/ShenghanZhang1123/graph_var_analysis/blob/main/notebooks/generating_data_analysis.ipynb) in a script I wrote called summarize_pantree_sv.py:
+Now to summarize the output vcf using code from their paper (https://github.com/ShenghanZhang1123/graph_var_analysis/blob/main/notebooks/generating_data_analysis.ipynb) in a script I wrote called pantree_summary.py:
 
-```
-#!/usr/bin/env python
-
-import sys
-import os
-import gzip
-import pandas as pd
-from collections import defaultdict
-
-# Input
-
-vcf_path = sys.argv[1]
-
-base = os.path.basename(vcf_path)
-chrom = base.split("_pantree")[0]
-
-outdir = "summary"
-os.makedirs(outdir, exist_ok=True)
-
-# Containers
-
-count_by_type_linear = defaultdict(lambda: defaultdict(int))
-sizes_by_type = defaultdict(list)
-size_bins = defaultdict(lambda: {"<50bp": 0, ">=50bp": 0})
-
-# Open VCF (gz or plain)
-
-open_func = gzip.open if vcf_path.endswith(".gz") else open
-
-with open_func(vcf_path, "rt") as f:
-    for line in f:
-        if line.startswith("#"):
-            continue
-
-        fields = line.rstrip().split("\t")
-        pos = int(fields[1])
-        info = fields[7]
-
-        # Parse INFO into dict
-        info_dict = {}
-        for entry in info.split(";"):
-            if "=" in entry:
-                k, v = entry.split("=", 1)
-                info_dict[k] = v
-
-        # ---- Variant type
-        if "VT" not in info_dict:
-            continue
-        vt = info_dict["VT"]
-
-        # ---- Linear vs off-linear
-        # DR=ref,alt
-        if "DR" in info_dict:
-            try:
-                dr_ref, dr_alt = map(int, info_dict["DR"].split(","))
-                linear = dr_alt == 0
-            except ValueError:
-                linear = False
-        else:
-            linear = False
-
-        count_by_type_linear[vt]["Linear" if linear else "Off-linear"] += 1
-
-        # ---- Size
-        if "END" in info_dict:
-            try:
-                end = int(info_dict["END"])
-                size = abs(end - pos)
-
-                sizes_by_type[vt].append(size)
-
-                if size < 50:
-                    size_bins[vt]["<50bp"] += 1
-                else:
-                    size_bins[vt][">=50bp"] += 1
-            except ValueError:
-                pass
-
-# Output CSVs
-
-# Counts by type × linearity
-rows = []
-for vt, d in count_by_type_linear.items():
-    for lin, cnt in d.items():
-        rows.append({
-            "Variant_Type": vt,
-            "Linearity": lin,
-            "Count": cnt
-        })
-
-pd.DataFrame(rows).to_csv(
-    f"{outdir}/{chrom}_pantree_sv_counts_linear.csv",
-    index=False
-)
-
-# Mean size per type
-rows = []
-for vt, sizes in sizes_by_type.items():
-    if sizes:
-        rows.append({
-            "Variant_Type": vt,
-            "Mean_Size": sum(sizes) / len(sizes)
-        })
-
-pd.DataFrame(rows).to_csv(
-    f"{outdir}/{chrom}_pantree_sv_mean_size.csv",
-    index=False
-)
-
-# Size bins
-rows = []
-for vt, bins in size_bins.items():
-    rows.append({
-        "Variant_Type": vt,
-        "<50bp": bins["<50bp"],
-        ">=50bp": bins[">=50bp"]
-    })
-
-pd.DataFrame(rows).to_csv(
-    f"{outdir}/{chrom}_pantree_sv_size_bins.csv",
-    index=False
-)
-
-print(f"Pantree SV summary complete for {chrom}")
-
-```
 Run it using this sbatch script, it outputs into the ```summary``` directory:
 
 ```
@@ -511,14 +385,24 @@ Run it using this sbatch script, it outputs into the ```summary``` directory:
 #SBATCH -e /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/logs/summarizepantree-%j.err
 #SBATCH -o /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/logs/summarizepantree-%j.out
 
-module load python
+module load miniforge3
+cd /uufs/chpc.utah.edu/common/home/u6071015/software/pantree
+source .venv/bin/activate
+export PYTHONPATH="/uufs/chpc.utah.edu/common/home/u6071015/software/pantree:${PYTHONPATH}"
 
-SCAFF="Scaffold_12__1_contigs__length_47609450"
+cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree
+SCAFF="Scaffold_9__2_contigs__length_79556474"
 
-#summarize SVs
-python summarize_pantree_sv.py ${SCAFF}_pantree.vcf.gz
+#mkdir summary
+
+#summarize SVs (edited from pantree manuscript, puts output in /summary subdir of working directory)
+python pantree_summary.py --vcf /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/${SCAFF}_pantree.vcf.gz --chrom ${SCAFF}
 
 ```
+The output from this summary has only non-linear variants. I'm wondering if I also have to include a sample list for the --ref-name to be used? I'm going to try this again on Scaffold 12, the shortest one, with the samples listed. I changed the name of the original pantree vcf made to Scaffold_12__1_contigs__length_47609450_nonlinear_pantree.vcf.gz, so that it is not overwritten. This is what I added to the end of the pantree run line: 
+--priority-samples t_crist_hwy154_cen4119.1,t_crist_hwy154_cen4280.1,t_crist_hwy154_cen4280.2,t_crist_refug_cen4122.1,t_crist_refug_cen4122.2,t_crist_refug_cen4120.1,t_crist_refug_cen4120.2
+
+I had to change the run time to 48 hours due to some maintenance on the cluster, should turn it back to 7 days when I can to run the remain scaffolds (2-8, 10, 11)
 
 To just output inversion vcf:
 
@@ -538,6 +422,7 @@ For Scaffold 9, there are 3 inversions (found by my old summary script and then 
  ```
 Wierdly, it says that the positions for all of these inversions are 1, which doesn't make sense.
 Also, wierdly, one of the inversions has no Ref or alt? The second inversion is huge.
+
 
 ## Pairwise comparison in Progressive Cactus
 
