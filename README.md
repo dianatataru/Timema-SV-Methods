@@ -531,6 +531,14 @@ zcat Scaffold_9__2_contigs__length_79556474_pantree.vcf.gz \
 ' \
 | gzip > Scaffold_9__2_contigs__length_79556474_pantree_inversions_only.vcf.gz
 ```
+
+For Scaffold 9, there are 3 inversions (found by my old summary script and then also by running   
+```
+ bcftools query -f '%POS\n' Scaffold_9__2_contigs__length_79556474_pantree_inversions_only.vcf.gz
+ ```
+Wierdly, it says that the positions for all of these inversions are 1, which doesn't make sense.
+Also, wierdly, one of the inversions has no Ref or alt? The second inversion is huge.
+
 ## Pairwise comparison in Progressive Cactus
 
 We are also going to call SVs from the pairwise comparisons, specifically focusing on comparisons between the reference haplotype used for the pangenome (HWY154 Stripe Haplotype2) and the other haplotypes. For this, I am creating softlinks in ''/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus'' to existing hal files, and need to make the hal file for H154 Stripe 2/Refugio Stripe 1 pair. TO do so, I run the script run_cactus.sh in the directory. The script also requires input file cactusTcrGSH2_TcrGSR1.txt:
