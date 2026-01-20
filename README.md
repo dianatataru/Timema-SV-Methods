@@ -108,7 +108,7 @@ Finished after about 10 hours in interactive job.
 Quickly visualize output vg with tube map onlione demo:https://vgteam.github.io/sequenceTubeMap/. but the file has to be under 5 mb so subset or run on local computer.
 
 
-### Investigating Cactus Output
+### Investigating Cactus Pangenome Output
 
 halStats output:
 
@@ -422,6 +422,193 @@ For Scaffold 9, there are 3 inversions (found by my old summary script and then 
  ```
 Wierdly, it says that the positions for all of these inversions are 1, which doesn't make sense.
 Also, wierdly, one of the inversions has no Ref or alt? The second inversion is huge.
+
+### Genome Annotation and GENESPACE visualization
+
+We can use the genespace visualization to validate the inversions and translocations found.
+Copying over the braker3 annotations from the Science Paper:
+
+```
+cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/annotation
+
+cp ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_refug_green_h1/braker/braker.aa t_crist_refug_green_h1.fa
+cp ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_refug_stripe_h1/braker2/braker.aa t_crist_refug_stripe_h1.fa #not found, changed dir name
+cp ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_hyw154_green_h2/braker/braker.aa t_crist_h154_green_h2.fa #not found, reran braker
+cp ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_hyw154_stripe_h1/braker/braker.aa t_crist_h154_stripe_h1.fa
+cp ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_hyw154_green_h1/brakerV1/braker.aa t_crist_h154_green_h1.fa #not found, changed dir name
+cp ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_refug_green_h2/braker/braker.aa t_crist_refug_green_h2.fa
+cp ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_refug_stripe_h2/braker/braker.aa t_crist_refug_stripe_h2.fa
+cp ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_hyw154_stripe_h2/brakerV1/braker.aa t_crist_h154_stripe_h2.fa #not found, changed dir name
+
+
+## fix format
+perl -p -i -e 's/\.t[0-9]//' *fa
+
+grep "gene" ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_refug_green_h1/braker/braker.gff3 | cut -f 1,4,5,9 | perl -p -i -e 's/ID=//' | perl -p -i -e 's/;//' > t_crist_refug_green_h1.bed 
+grep "gene" ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_refug_stripe_h1/braker2/braker.gff3 | cut -f 1,4,5,9 | perl -p -i -e 's/ID=//' | perl -p -i -e 's/;//' > t_crist_refug_stripe_h1.bed 
+grep "gene" ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_hyw154_green_h2/braker/braker.gff3 | cut -f 1,4,5,9 | perl -p -i -e 's/ID=//' | perl -p -i -e 's/;//' > t_crist_h154_green_h2.bed #not made
+grep "gene" ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_hyw154_stripe_h1/braker/braker.gff3 | cut -f 1,4,5,9 | perl -p -i -e 's/ID=//' | perl -p -i -e 's/;//' > t_crist_h154_stripe_h1.bed 
+grep "gene" ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_hyw154_green_h1/brakerV1/braker.gff3 | cut -f 1,4,5,9 | perl -p -i -e 's/ID=//' | perl -p -i -e 's/;//' > t_crist_h154_green_h1.bed 
+grep "gene" ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_refug_stripe_h2/braker/braker.gff3 | cut -f 1,4,5,9 | perl -p -i -e 's/ID=//' | perl -p -i -e 's/;//' > t_crist_refug_stripe_h2.bed 
+grep "gene" ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_hyw154_stripe_h2/brakerV1/braker.gff3 | cut -f 1,4,5,9 | perl -p -i -e 's/ID=//' | perl -p -i -e 's/;//' > t_crist_h154_stripe_h2.bed 
+```
+
+One of the annotations is missing so need to run braker on it
+
+```
+#!/bin/bash 
+#SBATCH --time=30:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=24
+#SBATCH --account=gompert
+#SBATCH --partition=gompert-grn
+#SBATCH --qos gompert-grn
+#SBATCH --job-name=braker
+#SBATCH --error=/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/annotation/braker-%j.err
+#SBATCH --output=/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/annotation/braker-%j.out
+
+source ~/.bashrc
+
+ml braker/3.0.8
+ml busco
+
+cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/annotation/t_crist_hyw154_green_h2
+
+## run braker
+
+braker.pl --genome=/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4280_hap2.fasta.masked \
+	--prot_seq=/uufs/chpc.utah.edu/common/home/gompert-group4/data/timema/hic_genomes/Annotation/proteins.fasta \
+	--rnaseq_sets_ids=clean_tcr135.17_0003_R,clean_tcr137.17_0006_R,clean_tcr139.17_0012_R,clean_tcr140.17_0015_R,clean_tcr141.17_0019_R,clean_tcr142.17_0043_R,clean_tcr143.17_0045_R,clean_tcr144.17_0049_R,clean_tcr145.17_0051_R,clean_tcr146.17_0057_R,clean_tcr148.17_0062_R,clean_tcr149.17_0065_R,clean_tcr150.17_0067_R,clean_tcr151.17_0070_R,clean_tcr152.17_0074_R,clean_tcr173.17_0075_R,clean_tcr174.17_0081_R,clean_tcr175.17_0082_R \
+	--rnaseq_sets_dirs=/uufs/chpc.utah.edu/common/home/gompert-group4/data/timema/rna_seq_for_annotations \
+	--AUGUSTUS_SCRIPTS_PATH=/usr/share/augustus/scripts \
+	--AUGUSTUS_CONFIG_PATH=/uufs/chpc.utah.edu/common/home/u6071015/augustus/config \
+	--threads=48 --gff3
+
+## run busco, genome and aa
+cd braker
+## genome
+#busco -i /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4280_hap2.fasta.masked -m geno -o busco_genome_out -l insecta_odb10
+
+## amino acids
+busco -i braker.aa -m prot -o busco_aa_out -l insecta_odb10
+
+## Augustus amino acids
+cd Augustus #had to add this for it to find the input files
+busco -i augustus.hints.aa -m prot -o busco_augustus_aa_out -l insecta_odb10
+```
+
+then prepare it like the rest of the files:
+```
+cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/annotation
+cp /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/annotation/t_crist_hyw154_green_h2/braker/braker.aa t_crist_h154_green_h2.fa
+perl -p -i -e 's/\.t[0-9]//' t_crist_h154_green_h2.fa
+grep "gene" /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/annotation/t_crist_refug_green_h2/braker/braker.gff3 | cut -f 1,4,5,9 | perl -p -i -e 's/ID=//' | perl -p -i -e 's/;//' > t_crist_refug_green_h2.bed
+```
+
+then we can run GENESPACE:
+
+first make folders and move files to those folders:
+
+```
+cd /scratch/general/nfs1/u6071015
+mkdir GENESPACE_TIMEMA
+cd GENESPACE_TIMEMA/
+mkdir peptide
+mkdir bed
+cp /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/annotation/*fa peptide/
+cp /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/annotation/*bed bed/
+
+```
+then run the program
+```
+#!/bin/bash 
+#SBATCH --time=3-00:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --mem=64G
+#SBATCH --account=gompert
+#SBATCH --partition=gompert-grn
+#SBATCH --qos=gompert-grn
+#SBATCH --job-name=GENESPACE
+#SBATCH --error=/scratch/general/nfs1/u6071015/GENESPACE_TIMEMA/GENESPACE-%j.err
+#SBATCH --output=/scratch/general/nfs1/u6071015/GENESPACE_TIMEMA/GENESPACE-%j.out
+
+#load modules
+module load orthofinder
+module load R
+
+cd /scratch/general/nfs1/u6071015/GENESPACE_TIMEMA/
+
+echo "start GENESPACE"
+
+Rscript genespace_TIMEMA.R
+
+echo "GENESPACE done"
+```
+
+and this is genespace_TIMEMA.R:
+
+```
+#create personal library to write packages to
+#dir.create("~/R/x86_64-pc-linux-gnu-library/4.4", recursive = TRUE, showWarnings = FALSE)
+#set library paths
+.libPaths("~/R/x86_64-pc-linux-gnu-library/4.4")
+
+#only run devtools download for the first time
+#if (!requireNamespace("devtools", quietly = TRUE))
+#    install.packages("devtools")
+#devtools::install_github("jtlovell/GENESPACE")
+
+#if (!requireNamespace("BiocManager", quietly = TRUE))
+#    install.packages("BiocManager")
+#BiocManager::install(c("Biostrings", "rtracklayer"))
+
+library(GENESPACE)
+
+#set working directory
+wd<-"/scratch/general/nfs1/u6071015/GENESPACE_TIMEMA/"
+path2mcscanx<-"~/bin/MCScanX/"
+
+# initalize the run and QC the inputs
+gpar<-init_genespace(wd=wd,path2mcscanx=path2mcscanx)
+
+# need to set this
+gpar$shellCalls$orthofinder<-"orthofinder"
+
+# accomplish the run
+out <- run_genespace(gpar, overwrite = T)
+
+# plot
+roi<-data.frame(
+		genome=c("t_crist_h154_green_h1","t_crist_h154_green_h2",
+			 "t_crist_h154_stripe_h1","t_crist_h154_stripe_h2",
+		"t_crist_refug_green_h1","t_crist_refug_green_h2",
+    "t_crist_refug_stripe_h1","t_crist_refug_stripe_h2"),
+		start=c(0,0,0,0,0,0,0,0,0,0),end=c(Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf))
+
+ggthemes <- ggplot2::theme(
+  panel.background = ggplot2::element_rect(fill = "white"))
+customPal <- colorRampPalette(c("darkorange", "skyblue", "darkblue", "purple", "darkred", "salmon"))
+
+pdf("syn8way.pdf",width=9,height=5.6)
+ripd <- plot_riparian(
+	gsParam = out,
+	palette = customPal,
+        #highlightBed = roi,
+	braidAlpha = .3,
+	useOrder=TRUE,
+	chrFill = "lightgrey",
+    addThemes = ggthemes,
+	useRegions = FALSE,
+	    #invertTheseChrs = invchr,
+  	refGenome = "t_crist_h154_stripe_h2",
+	genomeIDs = c("t_crist_h154_green_h1","t_crist_h154_green_h2",
+			 "t_crist_h154_stripe_h1","t_crist_h154_stripe_h2",
+		"t_crist_refug_green_h1","t_crist_refug_green_h2",
+    "t_crist_refug_stripe_h1","t_crist_refug_stripe_h2"),
+	backgroundColor = NULL)
+dev.off()
+```
 
 
 ## Pairwise comparison in Progressive Cactus
