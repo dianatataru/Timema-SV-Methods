@@ -736,6 +736,48 @@ TcrGSH2#0#Scaffold_10__2_contigs__length_75648701[6014359]
 
 #I think I am actually supposed to be using vg call instead
 vg call -A -c 50 -r cactusStripe_TcrGSH2_TcrGUSH2_DTv2.snarls --threads 6 -S TcrGSH2 cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg > cactusStripe_TcrGSH2_TcrGUSH2_DTv3.vcf.gz
+#error [vg call]: pack file (-k) is required
+vg pack -x cactusStripe_TcrGSH2_TcrGUSH2_DTv2.xg -t 6
+#error [vg pack]: Input must be provided with -g, -a or -i
+# so first I need to use make a gam or gaf ( i think i want gaf for long read)
+#double check this code before running
+vg index -x cactusStripe_TcrGSH2_TcrGUSH2_DTv2.xg \
+         -g cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gcsa \
+         -k 16 \
+         cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg
+
+vg minimizer cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg \
+  -o cactusStripe_TcrGSH2_TcrGUSH2_DTv2.min
+
+vg distance cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg \
+  -x cactusStripe_TcrGSH2_TcrGUSH2_DTv2.xg \
+  -o cactusStripe_TcrGSH2_TcrGUSH2_DTv2.dist
+
+vg giraffe \
+  -x cactusStripe_TcrGSH2_TcrGUSH2_DTv2.xg \
+  -g cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gcsa \
+  -m cactusStripe_TcrGSH2_TcrGUSH2_DTv2.min \
+  -d cactusStripe_TcrGSH2_TcrGUSH2_DTv2.dist \
+  -f TcrGSH2.fa \
+  > TcrGSH2.gaf
+
+vg giraffe \
+  -x cactusStripe_TcrGSH2_TcrGUSH2_DTv2.xg \
+  -g cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gcsa \
+  -m cactusStripe_TcrGSH2_TcrGUSH2_DTv2.min \
+  -d cactusStripe_TcrGSH2_TcrGUSH2_DTv2.dist \
+  -f TcrGUSH2.fa \
+  > TcrGUSH2.gaf
+
+vg convert -g TcrGSH2.gaf > TcrGSH2.gam
+vg convert -g TcrGUSH2.gaf > TcrGUSH2.gam
+
+vg pack -x cactusStripe_TcrGSH2_TcrGUSH2_DTv2.xg \
+        -g TcrGSH2.gam \
+        -g TcrGUSH2.gam \
+        -o cactusStripe_TcrGSH2_TcrGUSH2_DTv2.pack
+
+
 ```
 
 New Jay paper does the following with vg deconstruct vcf output:
