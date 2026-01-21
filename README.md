@@ -705,7 +705,38 @@ tabix -p vcf cactusStripe_TcrGSH2_TcrGUSH2_min50bp.vcf.gz
 bcftool stats cactusStripe_TcrGSH2_TcrGUSH2_min50bp.vcf.gz # number of records is 819, I think this is missing inversions
 
 ```
-GSH2 is the REF for all. 
+GSH2 is the REF for all. This was truncated due to this error:
+Couldn't read GT data: value not a number or '.' at TcrGSH2#0#Scaffold_10__2_contigs__length_75648701:281081 and TcrGSH2#0#Scaffold_10__2_contigs__length_75648701:2810840
+Error: VCF parse error
+
+trying to run this again with different options:
+
+```
+vg deconstruct cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg -P TcrGSH2 -S --snarls cactusStripe_TcrGSH2_TcrGUSH2_DTv2.snarls -e -a > cactusStripe_TcrGSH2_TcrGUSH2_DTv3.vcf
+bgzip cactusStripe_TcrGSH2_TcrGUSH2_DTv3.vcf
+tabix cactusStripe_TcrGSH2_TcrGUSH2_DTv3.vcf.gz
+
+#still bad.
+
+vg chunk \
+  -x cactusStripe_TcrGSH2_TcrGUSH2_DTv2.xg \
+  -p "TcrGSH2#0#Scaffold_10__2_contigs__length_75648701:2810800-2810900" \
+  --snarls cactusStripe_TcrGSH2_TcrGUSH2_DTv2.snarls \
+  -g > 2810800-2810900.vg
+
+
+vg view -d 2810800-2810900.vg > 2810800-2810900.dot
+dot -Tpdf 2810800-2810900.dot > 2810800-2810900.pdf
+vg snarls 2810800-2810900.vg > 2810800-2810900.snarls
+
+vg paths -v 2810800-2810900.vg -Q TcrGSH2 -L
+TcrGSH2#0#Scaffold_10__2_contigs__length_75648701[2810781]
+TcrGSH2#0#Scaffold_13__3_contigs__length_82050896[3492648]
+TcrGSH2#0#Scaffold_10__2_contigs__length_75648701[6014359]
+
+#I think I am actually supposed to be using vg call instead
+vg call -A -c 50 -r cactusStripe_TcrGSH2_TcrGUSH2_DTv2.snarls --threads 6 -S TcrGSH2 cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg > cactusStripe_TcrGSH2_TcrGUSH2_DTv3.vcf.gz
+```
 
 New Jay paper does the following with vg deconstruct vcf output:
 - ran vcfbub to keep only top-level variant sites (snarls) less than 100 kb in size
@@ -719,3 +750,9 @@ We use the Giraffe-DeepVariant workflows to align and call SVs from the GSH2-8ha
 ## Comparison across methods
 
 To compare the success of calling across methods, we can use sveval (https://github.com/jmonlong/sveval) with vcfs from each method, or Zhang et al. 2025 then use survivor (https://www.github.com/fritzsedlazeck/SURVIVOR; version 1.0.3) (Jeffares et al., 2017) to identify homologous SV.
+
+```
+ls *vcf > sample_files
+./SURVIVOR merge sample_files 1000 2 1 1 0 50 sample_merged.vcf
+#maximum allowed distance of 1kb, supported by 2 callers, agree on the type (1) and on the strand (1) of the SV, at least 50bp
+```
