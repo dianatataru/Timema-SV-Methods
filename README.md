@@ -339,13 +339,27 @@ and here is the sbatch script to run the python script, which I will call run_pa
 #SBATCH -e /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/logs/pantree-%j.err
 #SBATCH -o /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/logs/pantree-%j.out
 
+SCAFF="Scaffold_2__1_contigs__length_157594471"
+
 module load miniforge3
+
+#convert vg
+conda activate odgi
+cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus_pangenome/chrom-alignments
+vg convert -f  ${SCAFF}.vg -W > ${SCAFF}.gfa
+conda deactivate
+
+#run pantree
 cd /uufs/chpc.utah.edu/common/home/u6071015/software/pantree
 source .venv/bin/activate
 export PYTHONPATH="/uufs/chpc.utah.edu/common/home/u6071015/software/pantree:${PYTHONPATH}"
 
-# Run pantree 
-uv run pantree /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus/chrom-alignments/Scaffold_4__1_contigs__length_97222829.gfa /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/HWY154_REF_4119Hap2_pantree.vcf --ref-name Hap2_t_crist_hwy154_cen4119.2 --log-path /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/logs/run1_scaff4.log --chr-id scaff4
+uv run pantree /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus_pangenome/chrom-alignments/${SCAFF}.gfa \
+        /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/${SCAFF}_pantree.vcf.gz \
+        --ref-name Hap2_t_crist_hwy154_cen4119.2 \
+        --log-path /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/logs/${SCAFF}.log \
+        --chr-id ${SCAFF} \
+        --priority-samples t_crist_hwy154_cen4119.1,t_crist_hwy154_cen4280.1,t_crist_hwy154_cen4280.2,t_crist_refug_cen4122.1,t_crist_refug_c$
 
 ```
 My old run timed out due to some bugs in the program. I changed the name of the old program to pantree_OLD and downloaded the updated program in /uufs/chpc.utah.edu/common/home/u6071015/software/pantree. It had an OOM killed event trying to run the entire genome, so I have to run it scaffold by scaffold.
@@ -431,9 +445,9 @@ Copying over the braker3 annotations from the Science Paper:
 ```
 cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/annotation
 
-cp ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_refug_green_h1/braker/braker.aa t_crist_refug_green_h1.fa
-cp ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_refug_stripe_h1/braker2/braker.aa t_crist_refug_stripe_h1.fa #not found, changed dir name
-cp ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_hyw154_green_h2/braker/braker.aa t_crist_h154_green_h2.fa #not found, reran braker
+cp ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_refug_green_h1/braker/braker.aa t_crist_refug_green_h1.fa #REDOWNLOAD THIS
+cp ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_refug_stripe_h1/brakerV1/braker.aa t_crist_refug_stripe_h1.fa #not found, changed dir name
+cp ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_hyw154_green_h2/braker/braker.aa t_crist_h154_green_h2.fa #not found, reran braker but OLD
 cp ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_hyw154_stripe_h1/braker/braker.aa t_crist_h154_stripe_h1.fa
 cp ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_hyw154_green_h1/brakerV1/braker.aa t_crist_h154_green_h1.fa #not found, changed dir name
 cp ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_refug_green_h2/braker/braker.aa t_crist_refug_green_h2.fa
@@ -444,8 +458,9 @@ cp ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_hyw154_stripe_
 ## fix format
 perl -p -i -e 's/\.t[0-9]//' *fa
 
-grep "gene" ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_refug_green_h1/braker/braker.gff3 | cut -f 1,4,5,9 | perl -p -i -e 's/ID=//' | perl -p -i -e 's/;//' > t_crist_refug_green_h1.bed 
-grep "gene" ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_refug_stripe_h1/braker2/braker.gff3 | cut -f 1,4,5,9 | perl -p -i -e 's/ID=//' | perl -p -i -e 's/;//' > t_crist_refug_stripe_h1.bed 
+grep "gene" ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_refug_green_h1/braker/braker.gff3 | cut -f 1,4,5,9 | perl -p -i -e 's/ID=//' | perl -p -i -e 's/;//' > t_crist_refug_green_h1.bed
+grep "gene" ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_refug_green_h2/braker/braker.gff3 | cut -f 1,4,5,9 | perl -p -i -e 's/ID=//' | perl -p -i -e 's/;//' > t_crist_refug_green_h2.bed
+grep "gene" ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_refug_stripe_h1/brakerV1/braker.gff3 | cut -f 1,4,5,9 | perl -p -i -e 's/ID=//' | perl -p -i -e 's/;//' > t_crist_refug_stripe_h1.bed 
 grep "gene" ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_hyw154_green_h2/braker/braker.gff3 | cut -f 1,4,5,9 | perl -p -i -e 's/ID=//' | perl -p -i -e 's/;//' > t_crist_h154_green_h2.bed #not made
 grep "gene" ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_hyw154_stripe_h1/braker/braker.gff3 | cut -f 1,4,5,9 | perl -p -i -e 's/ID=//' | perl -p -i -e 's/;//' > t_crist_h154_stripe_h1.bed 
 grep "gene" ~/../gompert-group4/data/timema/hic_genomes/Annotation/t_crist_hyw154_green_h1/brakerV1/braker.gff3 | cut -f 1,4,5,9 | perl -p -i -e 's/ID=//' | perl -p -i -e 's/;//' > t_crist_h154_green_h1.bed 
@@ -502,7 +517,15 @@ then prepare it like the rest of the files:
 cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/annotation
 cp /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/annotation/t_crist_hyw154_green_h2/braker/braker.aa t_crist_h154_green_h2.fa
 perl -p -i -e 's/\.t[0-9]//' t_crist_h154_green_h2.fa
-grep "gene" /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/annotation/t_crist_refug_green_h2/braker/braker.gff3 | cut -f 1,4,5,9 | perl -p -i -e 's/ID=//' | perl -p -i -e 's/;//' > t_crist_refug_green_h2.bed
+grep "gene" /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/annotation/t_crist_h154_green_h2/braker/braker.gff3 | cut -f 1,4,5,9 | perl -p -i -e 's/ID=//' | perl -p -i -e 's/;//' > t_crist_hyw154_green_h2.bed
+
+#there are peptides missing from the bed genes, which means I need to filter the .fa files to match
+module load seqkit/2.8.2
+SAMPLE="t_crist_h154_green_h2"
+cut -f4 ${SAMPLE}.bed | sort -u > bed.ids
+seqkit grep -f bed.ids ${SAMPLE}.fa -o ${SAMPLE}_filtered.fa
+cp ${SAMPLE}_filtered.fa /scratch/general/nfs1/u6071015/GENESPACE_TIMEMA/peptide/${SAMPLE}.fa
+#for samples where the filtered matched unfiltered, I deleted the filtered file.
 ```
 
 then we can run GENESPACE:
@@ -515,7 +538,7 @@ mkdir GENESPACE_TIMEMA
 cd GENESPACE_TIMEMA/
 mkdir peptide
 mkdir bed
-cp /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/annotation/*fa peptide/
+cp /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/annotation/*filtered.fa peptide/
 cp /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/annotation/*bed bed/
 
 ```
@@ -680,10 +703,10 @@ The output of this ended up with way too many inversions called for my new .hal 
 
 halSummarizeMutations also doesn't come up with identifiers for mutations, so what I really need is a SV caller that develops position/reference-specific (?) identifiers so that I can then tell how many are unique across the pairwise comparisons. The trick is to do this without accidentally just creating another pangenome... it seems like vg might have a way of calling SVs, which would be ideal because I think we are also going to use vg's giraffe-deepvariant workflow for sv calling for GBS data. Also, it seems rigorous compared to other SV callers (Hickey et al. Genome Biology (2020) https://doi.org/10.1186/s13059-020-1941-7).
 
-You can convert hal to vg using ```hal2vg input.hal --inMemory --chop 32 --progress --refGenome > output.vg``` and then something like 
+For the following SV calling, GSH2 is the REF for all. 
 ```
 salloc --time=06:00:00 --ntasks 12 --nodes=1 --account=gompert --partition=gompert-grn --qos gompert-grn --mem=200G
-module load cactus/2.7.2
+module load cactus/3.0.1
 cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus
 
 hal2vg cactusStripe_TcrGSH2_TcrGUSH2_DTv2.hal --hdf5InMemory --chop 32 --progress > cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg
@@ -698,25 +721,14 @@ bgzip cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vcf
 tabix cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vcf.gz
 
 module load bcftools
-# subset to SVs greater than 0 bp, throws up error about GT but just rempves it
+# subset to SVs greater than 0 bp, throws up error about GT but just rem0ves it
 bcftools view -i 'strlen(REF)>50 || strlen(ALT)>50' \
     cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vcf.gz -G -Oz -o cactusStripe_TcrGSH2_TcrGUSH2_min50bp.vcf.gz
 tabix -p vcf cactusStripe_TcrGSH2_TcrGUSH2_min50bp.vcf.gz
-bcftool stats cactusStripe_TcrGSH2_TcrGUSH2_min50bp.vcf.gz # number of records is 819, I think this is missing inversions
+bcftool stats cactusStripe_TcrGSH2_TcrGUSH2_min50bp.vcf.gz # number of records is 819, I think this is missing a lot of stuff
 
-```
-GSH2 is the REF for all. This was truncated due to this error:
-Couldn't read GT data: value not a number or '.' at TcrGSH2#0#Scaffold_10__2_contigs__length_75648701:281081 and TcrGSH2#0#Scaffold_10__2_contigs__length_75648701:2810840
-Error: VCF parse error
-
-trying to run this again with different options:
-
-```
-vg deconstruct cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg -P TcrGSH2 -S --snarls cactusStripe_TcrGSH2_TcrGUSH2_DTv2.snarls -e -a > cactusStripe_TcrGSH2_TcrGUSH2_DTv3.vcf
-bgzip cactusStripe_TcrGSH2_TcrGUSH2_DTv3.vcf
-tabix cactusStripe_TcrGSH2_TcrGUSH2_DTv3.vcf.gz
-
-#still bad.
+#truncated due to this VCF parse error:
+#Couldn't read GT data: value not a number or '.' at TcrGSH2#0#Scaffold_10__2_contigs__length_75648701:281081 and #TcrGSH2#0#Scaffold_10__2_contigs__length_75648701:2810840
 
 vg chunk \
   -x cactusStripe_TcrGSH2_TcrGUSH2_DTv2.xg \
@@ -724,41 +736,36 @@ vg chunk \
   --snarls cactusStripe_TcrGSH2_TcrGUSH2_DTv2.snarls \
   -g > 2810800-2810900.vg
 
-
 vg view -d 2810800-2810900.vg > 2810800-2810900.dot
 dot -Tpdf 2810800-2810900.dot > 2810800-2810900.pdf
-vg snarls 2810800-2810900.vg > 2810800-2810900.snarls
 
 vg paths -v 2810800-2810900.vg -Q TcrGSH2 -L
 TcrGSH2#0#Scaffold_10__2_contigs__length_75648701[2810781]
 TcrGSH2#0#Scaffold_13__3_contigs__length_82050896[3492648]
 TcrGSH2#0#Scaffold_10__2_contigs__length_75648701[6014359]
 
-#I think I am actually supposed to be using vg call instead
-vg call -A -c 50 -r cactusStripe_TcrGSH2_TcrGUSH2_DTv2.snarls --threads 6 -S TcrGSH2 cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg > cactusStripe_TcrGSH2_TcrGUSH2_DTv3.vcf.gz
-#error [vg call]: pack file (-k) is required
-vg pack -x cactusStripe_TcrGSH2_TcrGUSH2_DTv2.xg -t 6
-#error [vg pack]: Input must be provided with -g, -a or -i
-# so first I need to use make a gam or gaf ( i think i want gaf for long read)
-#double check this code before running
+# this is a translocation, which deconstruct can't handle. I actually want to be using vg call.
+# First I need to make associated indexes and a gam for each fasta
+
 vg index -x cactusStripe_TcrGSH2_TcrGUSH2_DTv2.xg \
          -g cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gcsa \
-         -k 16 \
+         -L -j cactusStripe_TcrGSH2_TcrGUSH2_DTv2.dist \
          cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg
-
-vg minimizer cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg \
-  -o cactusStripe_TcrGSH2_TcrGUSH2_DTv2.min
 
 vg distance cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg \
   -x cactusStripe_TcrGSH2_TcrGUSH2_DTv2.xg \
   -o cactusStripe_TcrGSH2_TcrGUSH2_DTv2.dist
+
+vg minimizer cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg \
+  -d cactusStripe_TcrGSH2_TcrGUSH2_DTv2.dist \
+  -o cactusStripe_TcrGSH2_TcrGUSH2_DTv2.min
 
 vg giraffe \
   -x cactusStripe_TcrGSH2_TcrGUSH2_DTv2.xg \
   -g cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gcsa \
   -m cactusStripe_TcrGSH2_TcrGUSH2_DTv2.min \
   -d cactusStripe_TcrGSH2_TcrGUSH2_DTv2.dist \
-  -f TcrGSH2.fa \
+  -f /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap2.fasta.masked \
   > TcrGSH2.gaf
 
 vg giraffe \
@@ -766,17 +773,44 @@ vg giraffe \
   -g cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gcsa \
   -m cactusStripe_TcrGSH2_TcrGUSH2_DTv2.min \
   -d cactusStripe_TcrGSH2_TcrGUSH2_DTv2.dist \
-  -f TcrGUSH2.fa \
+  -f /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4280_hap2.fasta.masked \
   > TcrGUSH2.gaf
 
 vg convert -g TcrGSH2.gaf > TcrGSH2.gam
 vg convert -g TcrGUSH2.gaf > TcrGUSH2.gam
 
-vg pack -x cactusStripe_TcrGSH2_TcrGUSH2_DTv2.xg \
+#need a .gbz for giraffe
+vg convert -f cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg > cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gfa
+
+vg gbwt --num-jobs 16 --gbz-format -g cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gbz -G cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gfa
+
+vg autoindex --workflow giraffe -g cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gfa \
+	-p cactusStripe_TcrGSH2_TcrGUSH2_DTv2 \
+	-G cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gbz
+
+vg giraffe -b hifi -Z cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gbz \
+	-f /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap2.fasta.masked \
+	-p > TcrGSH2.gam
+
+Note: vg augment, vg pack, vg call and vg snarls can now all be run on directly on any graph format (ex .gbz, .gfa, .vg, .xg (except augment) or anything output by vg convert). Operating on .vg or '.gfa' uses the most memory and is not recommended for large graphs. The output of vg pack can only be read in conjunction with the same graph used to create it, so vg pack x.vg -g aln.gam -o x.pack then vg call x.xg -k x.pack will not work.
+
+vg pack cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg \
         -g TcrGSH2.gam \
         -g TcrGUSH2.gam \
         -o cactusStripe_TcrGSH2_TcrGUSH2_DTv2.pack
 
+vg call -A -c 50 -r cactusStripe_TcrGSH2_TcrGUSH2_DTv2.snarls \
+	--threads 6 -S TcrGSH2 \
+	-k cactusStripe_TcrGSH2_TcrGUSH2_DTv2.pack \
+	cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg > cactusStripe_TcrGSH2_TcrGUSH2_DTv3.vcf.gz
+
+module load cactus/3.0.1
+cd /scratch/general/nfs1/u6071015/cactusNp
+cactus-graphmap-join pairwisejobstore --vg /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg \
+	--hal /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusStripe_TcrGSH2_TcrGUSH2_DTv2.hal \
+	--reference TcrGSH2 \
+	--outDir /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactus_graphmap \
+ 	--outName cactusStripe_TcrGSH2_TcrGUSH2_DTv2 --gbz --haplo
 
 ```
 
@@ -791,7 +825,8 @@ We use the Giraffe-DeepVariant workflows to align and call SVs from the GSH2-8ha
 
 ## Comparison across methods
 
-To compare the success of calling across methods, we can use sveval (https://github.com/jmonlong/sveval) with vcfs from each method, or Zhang et al. 2025 then use survivor (https://www.github.com/fritzsedlazeck/SURVIVOR; version 1.0.3) (Jeffares et al., 2017) to identify homologous SV.
+To compare the success of calling across methods, we can use sveval (https://github.com/jmonlong/sveval) with vcfs from each method, or Zhang et al. 2025 then use survivor (https://www.github.com/fritzsedlazeck/SURVIVOR; version 1.0.3) (Jeffares et al., 2017) to identify homologous SV. Here is a survivor tutorial:
+https://evomics.org/learning/population-and-speciation-genomics/2022-population-and-speciation-genomics/detecting-structural-variants-lab/
 
 ```
 ls *vcf > sample_files
