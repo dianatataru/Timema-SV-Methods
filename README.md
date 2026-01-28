@@ -727,7 +727,7 @@ halSummarizeMutations also doesn't come up with identifiers for mutations, so wh
 
 For the following SV calling, GSH2 is the REF for all. 
 ```
-salloc --time=06:00:00 --ntasks 12 --nodes=1 --account=gompert --partition=gompert-grn --qos gompert-grn --mem=200G
+salloc --time=06:00:00 --ntasks 1 --nodes=1 --account=gompert --partition=gompert-grn --qos gompert-grn --mem=300G
 module load cactus/3.0.1
 cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus
 
@@ -774,10 +774,6 @@ vg index -x cactusStripe_TcrGSH2_TcrGUSH2_DTv2.xg \
          -L -j cactusStripe_TcrGSH2_TcrGUSH2_DTv2.dist \
          cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg
 
-vg distance cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg \
-  -x cactusStripe_TcrGSH2_TcrGUSH2_DTv2.xg \
-  -o cactusStripe_TcrGSH2_TcrGUSH2_DTv2.dist
-
 vg minimizer cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg \
   -d cactusStripe_TcrGSH2_TcrGUSH2_DTv2.dist \
   -o cactusStripe_TcrGSH2_TcrGUSH2_DTv2.min
@@ -798,41 +794,66 @@ vg giraffe \
   -f /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4280_hap2.fasta.masked \
   > TcrGUSH2.gaf
 
-vg convert -g TcrGSH2.gaf > TcrGSH2.gam
-vg convert -g TcrGUSH2.gaf > TcrGUSH2.gam
-
-#need a .gbz for giraffe
-vg convert -f cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg > cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gfa
-
-vg gbwt --num-jobs 16 --gbz-format -g cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gbz -G cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gfa
-
 vg autoindex --workflow giraffe -g cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gfa \
 	-p cactusStripe_TcrGSH2_TcrGUSH2_DTv2 \
 	-G cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gbz
 
-vg giraffe -b hifi -Z cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gbz \
-	-f /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap2.fasta.masked \
-	-p > TcrGSH2.gam
-
-Note: vg augment, vg pack, vg call and vg snarls can now all be run on directly on any graph format (ex .gbz, .gfa, .vg, .xg (except augment) or anything output by vg convert). Operating on .vg or '.gfa' uses the most memory and is not recommended for large graphs. The output of vg pack can only be read in conjunction with the same graph used to create it, so vg pack x.vg -g aln.gam -o x.pack then vg call x.xg -k x.pack will not work.
-
-vg pack cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg \
-        -g TcrGSH2.gam \
-        -g TcrGUSH2.gam \
-        -o cactusStripe_TcrGSH2_TcrGUSH2_DTv2.pack
-
-vg call -A -c 50 -r cactusStripe_TcrGSH2_TcrGUSH2_DTv2.snarls \
-	--threads 6 -S TcrGSH2 \
-	-k cactusStripe_TcrGSH2_TcrGUSH2_DTv2.pack \
-	cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg > cactusStripe_TcrGSH2_TcrGUSH2_DTv3.vcf.gz
+vg convert -g TcrGSH2.gaf > TcrGSH2.gam
+vg convert -g TcrGUSH2.gaf > TcrGUSH2.gam
+```
+or as sbatch script 
+```
+#!/bin/sh 
+#SBATCH --time=240:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=12
+#SBATCH --account=gompert
+#SBATCH --partition=gompert-grn
+#SBATCH --job-name=cactus
+#SBATCH --qos gompert-grn
+#SBATCH -e cactus-%j.err
+#SBATCH -o cactus-%j.out
+#SBATCH --mem=300G
 
 module load cactus/3.0.1
-cd /scratch/general/nfs1/u6071015/cactusNp
-cactus-graphmap-join pairwisejobstore --vg /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg \
-	--hal /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusStripe_TcrGSH2_TcrGUSH2_DTv2.hal \
-	--reference TcrGSH2 \
-	--outDir /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactus_graphmap \
- 	--outName cactusStripe_TcrGSH2_TcrGUSH2_DTv2 --gbz --haplo
+cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus
+
+PAIR="cactusStripe_TcrGSH2_TcrGUSH2_DTv2"
+GENOME1="t_crist_hwy154_cen4119_hap2.fasta.masked"
+GENOME2="t_crist_hwy154_cen4280_hap2.fasta.masked"
+SAMP1="TcrGSH2"
+SAMP2="TcrGUSH2"
+
+#hal2vg ${PAIR}.hal --hdf5InMemory --chop 32 --progress > ${PAIR}.vg
+
+#vg index ${PAIR}.vg -x ${PAIR}.xg -L
+
+#vg snarls ${PAIR}.xg > ${PAIR}.snarls
+
+#vg convert -f ${PAIR}.vg > ${PAIR}.gfa
+
+#vg gbwt --num-jobs 16 --gbz-format -g ${PAIR}.gbz -G ${PAIR}.gfa
+
+vg index ${PAIR}.vg \
+         -L -j ${PAIR}.dist 
+
+vg giraffe -b hifi -Z ${PAIR}.gbz \
+	-f /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/${GENOME1} \
+	-p > ${SAMP1}.gam
+
+vg giraffe -b hifi -Z ${PAIR}.gbz \
+	-f /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/${GENOME2} \
+	-p > ${SAMP2}.gam
+
+vg pack ${PAIR}.vg \
+        -g ${SAMP1}.gam \
+        -g ${SAMP2}.gam \
+        -o ${PAIR}.pack
+
+vg call -A -c 50 -r ${PAIR}.snarls \
+	--threads 6 -S ${SAMP1} \
+	-k ${PAIR}.pack \
+	${PAIR}.vg > ${PAIR}.vcf.gz
 
 ```
 
