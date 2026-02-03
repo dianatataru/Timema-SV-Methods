@@ -903,7 +903,6 @@ New Jay paper does the following with vg deconstruct vcf output:
 We use the Giraffe-DeepVariant workflows to align and call SVs from the GSH2-8haplotype pangenome (https://www.science.org/doi/epdf/10.1126/science.abg8871, https://github.com/vgteam/vg_wdl?tab=readme-ov-file#giraffe-deepvariant-workflow).
 
 ```
-#example from here: https://github.com/vgteam/vg/issues/4777
 
 # Graph alignment
 vg giraffe \
@@ -929,8 +928,8 @@ vg call \
   ${PANGENOME}.gbz \
   -r ${PANGENOME}.snarls \
   -k ${id}.pack \
-  -a -A \
-  -t 20 \
+  -a -A --progress\
+  -t 20 -z -c 50 -C 10000000\
   -s ${id} \
   > ${id}.vcf
 ```
