@@ -825,6 +825,8 @@ or as sbatch script
 module load cactus/3.0.1
 cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus
 
+export TMPDIR="/scratch/general/nfs1/u6071015/vg_tmp"
+
 PAIR="cactusStripe_TcrGSH2_TcrGUSH2_DTv2"
 GENOME1="t_crist_hwy154_cen4119_hap2.fasta.masked"
 GENOME2="t_crist_hwy154_cen4280_hap2.fasta.masked"
@@ -840,6 +842,8 @@ SAMP2="TcrGUSH2"
 #vg convert -f ${PAIR}.vg > ${PAIR}.gfa
 
 #vg gbwt --num-jobs 16 --gbz-format -g ${PAIR}.gbz -G ${PAIR}.gfa
+
+vg prune -r -p -t 16 ${PAIR}.vg > ${PAIR}.pruned.vg
 
 vg index ${PAIR}.vg \
          -L -j ${PAIR}.dist 
@@ -863,7 +867,32 @@ vg call -A -c 50 -r ${PAIR}.snarls \
 	${PAIR}.vg > ${PAIR}.vcf.gz
 
 ```
+vg prune worked with a temp dir added, but vg index still oom killing after:
 
+```
+[vg prune] Original graph cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg: 75689771 nodes, 90722944 edges
+[vg prune] Built a temporary XG index
+[vg prune] Removed all paths
+[vg prune] Pruned complex regions: 75689771 nodes, 81196671 edges
+[vg prune] Removed small subgraphs: 66856969 nodes, 77460277 edges
+Restored graph: 75689771 nodes
+[vg prune] Serialized the graph: 75689771 nodes, 90722944 edges
+INFO:    gocryptfs not found, will not be able to use gocryptfs
+/uufs/chpc.utah.edu/sys/installdir/lmod/8.6-r8/init/bash: line 82: 1265292 Killed                  apptainer exec --nv /uufs/chpc.utah.edu/sys/installdir/cactus/3.1.4/cactus-3.1.4.sif vg $@
+slurmstepd: error: Detected 1 oom_kill event in StepId=814509.batch. Some of the step tasks have been OOM Killed.
+```
+
+could maybe prune deeper?
+
+```
+vg prune \
+  -k 16 \
+  -X 2 \
+  -e 2 \
+  -p \
+  -t 16 \
+  cactusStripe.vg > cactusStripe.pruned.vg
+```
 New Jay paper does the following with vg deconstruct vcf output:
 - ran vcfbub to keep only top-level variant sites (snarls) less than 100 kb in size
 - used vcfwave to realign REF and ALT alleles to split nested alleles to separate entries and identify inversions >1kb
@@ -872,6 +901,39 @@ New Jay paper does the following with vg deconstruct vcf output:
 ## GBS Data Alignment and Variant Calling from Pangenome
 
 We use the Giraffe-DeepVariant workflows to align and call SVs from the GSH2-8haplotype pangenome (https://www.science.org/doi/epdf/10.1126/science.abg8871, https://github.com/vgteam/vg_wdl?tab=readme-ov-file#giraffe-deepvariant-workflow).
+
+```
+#example from here: https://github.com/vgteam/vg/issues/4777
+
+# Graph alignment
+vg giraffe \
+  -Z ${PANGENOME}.gbz \
+  -f ${id}_1.clean.fq.gz \
+  -f ${id}_2.clean.fq.gz \
+  -t 50 \
+  > ${id}.gam
+
+# Snarl detection
+vg snarls -t 20 ${PANGENOME}.gbz > ${PANGENOME}.snarls
+
+# Coverage packing
+vg pack \
+  -x ${PANGENOME}.gbz \
+  -g ${id}.gam \
+  -Q 5 \
+  -t 20 \
+  -o ${id}.pack
+
+# Variant calling
+vg call \
+  ${PANGENOME}.gbz \
+  -r ${PANGENOME}.snarls \
+  -k ${id}.pack \
+  -a -A \
+  -t 20 \
+  -s ${id} \
+  > ${id}.vcf
+```
 
 ## Comparison across methods
 
