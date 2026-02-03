@@ -794,9 +794,16 @@ vg giraffe \
   -f /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4280_hap2.fasta.masked \
   > TcrGUSH2.gaf
 
+vg prune -r -p -t 2 cactusStripe_TcrGSH2_TcrGUSH2_DTv2.vg > cactusStripe_TcrGSH2_TcrGUSH2_DTv2.pruned.vg
+vg index cactusStripe_TcrGSH2_TcrGUSH2_DTv2.pruned.vg -L -j cactusStripe_TcrGSH2_TcrGUSH2_DTv2.pruned.dist 
+
 vg autoindex --workflow giraffe -g cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gfa \
 	-p cactusStripe_TcrGSH2_TcrGUSH2_DTv2 \
-	-G cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gbz
+	-G cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gbz \
+	--threads 2 --target-mem 5G --verbosity 2 -T temp/
+
+# Constructing distance index for Giraffe.
+#Killed
 
 vg convert -g TcrGSH2.gaf > TcrGSH2.gam
 vg convert -g TcrGUSH2.gaf > TcrGUSH2.gam
