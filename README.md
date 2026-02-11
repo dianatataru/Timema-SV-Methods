@@ -459,6 +459,47 @@ For Scaffold 9, there are 3 inversions (found by my old summary script and then 
 Wierdly, it says that the positions for all of these inversions are 1, which doesn't make sense.
 Also, wierdly, one of the inversions has no Ref or alt? The second inversion is huge.
 
+to subset to SVs no SNPs or bigger than 50 bp:
+
+```
+salloc --time=06:00:00 --ntasks 12 --nodes=1 --account=gompert --partition=gompert-grn --qos gompert-grn
+module load bcftools
+bcftools query \
+  -f '%CHROM\t%POS\t%ID\t%INFO/AC\t%INFO/RC\t%INFO/VT\t%INFO/TP\n' \
+  Scaffold_4__1_contigs__length_97222829_pantree.vcf.gz \
+  > Scaffold_4__1_contigs__length_97222829_pantree.vcf_minimal.tsv
+
+ awk -F'\t' '$6 != "SNP"' Scaffold_4__1_contigs__length_97222829_pantree.vcf_minimal.tsv \
+  > Scaffold_4_noSNPs.tsv
+
+bcftools view \
+  -i 'strlen(REF)>50 || strlen(ALT)>50' \
+  Scaffold_4__1_contigs__length_97222829_pantree.vcf.gz \
+  -Oz -o Scaffold_4__1_contigs__length_97222829_pantree.len50bpplus.vcf.gz
+
+bcftools query -f '%ID\t%REF\t%ALT\n' Scaffold_4__1_contigs__length_97222829_pantree_inversions_only.vcf.gz > Scaffold_4_inv_alleles.tsv
+awk '{print ">"$1"\n"$3}' Scaffold_4_inv_alleles.tsv > Scaffold_4_inv_alt.fa
+
+module load cactus/3.0.1
+vg giraffe -Z hs37d5-pangenome.giraffe.gbz -m hs37d5-pangenome.shortread.withzip.min -z hs37d5-pangenome.shortread.zipcodes -d hs37d5-pangenome.dist -f sim.fq >mapped.gam
+
+vg giraffe \
+  -Z HWY154_REF_4119Hap2.d2.gbz \
+  -d HWY154_REF_4119Hap2.d2.dist \
+  -m HWY154_REF_4119Hap2.d2.min \
+  -f /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/Scaffold_4_inv_alt.fa \
+  > Scaffold_4_inv_alt.gam
+
+KILLED
+
+vg surject \
+  -x HWY154_REF_4119Hap2.d2.gbz \
+  -b Scaffold_4_inv_alt.gam \
+  -p Hap2_t_crist_hwy154_cen4119 \
+  > Scaffold_4_inv_alt.bam
+
+```
+
 ### Genome Annotation and GENESPACE visualization
 
 We can use the genespace visualization to validate the inversions and translocations found.
