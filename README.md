@@ -4,12 +4,12 @@ Identifying how different methods of structural variant (SV) detection identify 
 ## Pangenome Creation
 Starting off with making pangenomes with 1) 4 hwy154 genomes and 2) 8 genomes (4 hwy154 and 4 refugio) in cactus minigraph (paper:https://www.nature.com/articles/s41587-023-01793-w, documentation: https://github.com/ComparativeGenomicsToolkit/cactus/blob/master/doc/pangenome.md).
 
-|  POP  | STRIPE |   ID  |
-|-------|--------|-------|
-|HWY154 |striped |cen4119|
-|HWY154 |  green |cen4280|
-|REFUGIO|striped |cen4122|
-|REFUGIO|  green |cen4120|
+|  POP  | STRIPE |   ID  | SHORT |HAP|    SCIENCE BOUNDS    |
+|-------|--------|-------|-------|---|----------------------|
+|HWY154 |striped |cen4119| H GS  | 2 |24,457,103–39,030,359 |
+|HWY154 |  green |cen4280| H GUS | 1 |24,803,527–44,121,870 |
+|REFUGIO|striped |cen4122| R GS  | 1 |22,442,098–65,729,704 |
+|REFUGIO|  green |cen4120| R GUS | 1 |22,220,178–65,829,835 |
 
 Working directory can be found in ```/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/```. I copied the soft masked genomes to subdirectory "genomes" in this directory. Note, Minigraph-Cactus ignores softmasking. 
 
@@ -472,10 +472,8 @@ bcftools query \
  awk -F'\t' '$6 != "SNP"' Scaffold_4__1_contigs__length_97222829_pantree.vcf_minimal.tsv \
   > Scaffold_4_noSNPs.tsv
 
-bcftools view \
-  -i 'strlen(REF)>50 || strlen(ALT)>50' \
-  Scaffold_4__1_contigs__length_97222829_pantree.vcf.gz \
-  -Oz -o Scaffold_4__1_contigs__length_97222829_pantree.len50bpplus.vcf.gz
+bcftools view -i 'strlen(INFO/NR) > 50'  Scaffold_4__1_contigs__length_97222829_pantree.vcf.gz -Oz -o Scaffold_4__1_contigs__length_97222829_pantree.len50bpplus.vcf.gz
+
 
 bcftools query -f '%ID\t%REF\t%ALT\n' Scaffold_4__1_contigs__length_97222829_pantree_inversions_only.vcf.gz > Scaffold_4_inv_alleles.tsv
 awk '{print ">"$1"\n"$3}' Scaffold_4_inv_alleles.tsv > Scaffold_4_inv_alt.fa
@@ -497,6 +495,45 @@ vg surject \
   -b Scaffold_4_inv_alt.gam \
   -p Hap2_t_crist_hwy154_cen4119 \
   > Scaffold_4_inv_alt.bam
+
+#trying to just align pantree swith to one genome
+module load minimap2
+
+
+bcftools query -f '%ID\t%REF\t%ALT\n' Scaffold_4__1_contigs__length_97222829_pantree_inversions_only.vcf.gz | \
+  awk '$3 != "." {
+    id = $1
+    gsub(/>/, "fw", id)
+    gsub(/</, "rv", id)
+    print ">" id "\n" $3
+  }' > Scaffold_4_inv_alt_clean.fa
+
+#t_crist_hwy154_cen4119_hap2
+minimap2 -cx asm5 \
+  /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap2.fasta.masked \
+  Scaffold_4_inv_alt_clean.fa \
+  > t_crist_hwy154_cen4119_hap2_scaff4_inversions.paf
+
+sort -k6,6 -k8,8n t_crist_hwy154_cen4119_hap2_scaff4_inversions.paf >t_crist_hwy154_cen4119_hap2_scaff4_inversions.srt.paf            
+paftools.js call t_crist_hwy154_cen4119_hap2_scaff4_inversions.srt.paf  > t_crist_hwy154_cen4119_hap2_scaff4_inversions.srt.paf.txt
+
+#t_crist_refug_cen4120_hap2
+minimap2 -cx asm5 \
+  /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_refug_cen4120_hap2.fasta.masked \
+  Scaffold_4_inv_alt_clean.fa \
+  >  t_crist_refug_cen4120_hap2_scaff4_inversions.paf
+
+sort -k6,6 -k8,8n t_crist_refug_cen4120_hap2_scaff4_inversions.paf > t_crist_refug_cen4120_hap2_scaff4_inversions.srt.paf            
+paftools.js call t_crist_refug_cen4120_hap2_scaff4_inversions.srt.paf   > t_crist_refug_cen4120_hap2_scaff4_inversions.srt.paf.txt
+
+#t_crist_refug_cen4122_hap1.fasta.masked
+minimap2 -cx asm5 \
+  /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_refug_cen4122_hap1.fasta.masked \
+  Scaffold_4_inv_alt_clean.fa \
+  >  t_crist_refug_cen4122_hap1_scaff4_inversions.paf
+
+sort -k6,6 -k8,8n t_crist_refug_cen4122_hap1_scaff4_inversions.paf > t_crist_refug_cen4122_hap1_scaff4_inversions.srt.paf            
+paftools.js call t_crist_refug_cen4122_hap1_scaff4_inversions.srt.paf > t_crist_refug_cen4122_hap1_scaff4_inversions.srt.paf.txt
 
 ```
 
