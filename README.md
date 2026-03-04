@@ -746,7 +746,7 @@ TcrGSR1 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods
 ```
 run_cactus.sh:
 ```
-#!/bin/sh 
+#!/bin/bash 
 #SBATCH --time=240:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=24
@@ -888,7 +888,7 @@ vg convert -g TcrGUSH2.gaf > TcrGUSH2.gam
 ```
 or as sbatch script 
 ```
-#!/bin/sh 
+#!/bin/bash 
 #SBATCH --time=240:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=12
@@ -976,40 +976,214 @@ New Jay paper does the following with vg deconstruct vcf output:
 - used vcfwave to realign REF and ALT alleles to split nested alleles to separate entries and identify inversions >1kb
 - combined vcf files with bcftools concat, added in missing sample coolumns with bcftools query, and used bcftools fixploidy to set allele number for every site and bcftools fill tags to add AF and AC for each each site. Also used bcftools norm to split multiallelic to biallelic
 
-## GBS Data Alignment and Variant Calling from Pangenome
+## GBS Data Alignment and Variant Calling from Pangenome with VG
 
 We use the Giraffe-DeepVariant workflows to align and call SVs from the GSH2-8haplotype pangenome (https://www.science.org/doi/epdf/10.1126/science.abg8871, https://github.com/vgteam/vg_wdl?tab=readme-ov-file#giraffe-deepvariant-workflow).
 
+This filter graph is made by removing nodes covered by fewer than 2 haplotypes (this value can be changed using the --filter option) from the clip graph. generally the clip graph for everything except --giraffe which defaults to the filter graph, and anything odgi-related which defaults to full. 
+
+The distance index is a memory-mapped file. As of vg version 1.48.0, the file will be opened in read+write mode by default. This can cause issues in HPC clusters and other distributed environments, where multiple computers try to access the same distance index file. To avoid this, make the file read-only or use a local copy of the file.
+soft linked files:
+
 ```
+ln -s /uufs/chpc.utah.edu/common/home/gompert-group3/data/sheffield/timema/2013fha_gwas/02_ids_reads/cristinae/2013*bz2 data/
+chmod 444 HWY154_REF_4119Hap2.d2.dist
+```
+now run alignment and variant calling
 
-# Graph alignment
+```
+#!/bin/bash
+#SBATCH --time=240:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=24
+#SBATCH --account=gompert
+#SBATCH --partition=gompert-grn
+#SBATCH --job-name=mapGBS
+#SBATCH --qos gompert-grn
+#SBATCH -e /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/logs/mapGBS-%A_%a.err
+#SBATCH -o /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/logs/mapGBS-%A_%a.out
+#SBATCH --mem=200G
+#SBATCH --array=0-1
+
+module load cactus/3.0.1
+cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS
+
+FILES=(data/*.fq.bz2)
+FILE=${FILES[$SLURM_ARRAY_TASK_ID]}
+id=$(basename "$FILE" .fq.bz2)
+echo ID=${id}
+
+PANGENOME_PATH="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus_pangenome/HWY154_REF_4119Hap2"
+PANGENOME="HWY154_REF_4119Hap2.d2"
+
+# Graph alignment (do I need -x graph.xg?
 vg giraffe \
-  -Z ${PANGENOME}.gbz \
-  -f ${id}_1.clean.fq.gz \
-  -f ${id}_2.clean.fq.gz \
-  -t 50 \
-  > ${id}.gam
+  -Z ${PANGENOME_PATH}/${PANGENOME}.gbz \
+  -d ${PANGENOME_PATH}/${PANGENOME}.dist \
+  -z ${PANGENOME_PATH}/${PANGENOME}.shortread.zipcodes \
+  -m ${PANGENOME_PATH}/${PANGENOME}.shortread.withzip.min \
+  -f <(bzcat data/${id}.fq.bz2) \
+  -t 24 \
+  > vg_intermediate/${id}.gam
 
-# Snarl detection
-vg snarls -t 20 ${PANGENOME}.gbz > ${PANGENOME}.snarls
+vg stats -a vg_intermediate/${id}.gam > vg_stats/${id}.stats.txt
 
 # Coverage packing
 vg pack \
-  -x ${PANGENOME}.gbz \
-  -g ${id}.gam \
+  -x ${PANGENOME_PATH}/${PANGENOME}.gbz \
+  -g vg_intermediate/${id}.gam \
   -Q 5 \
   -t 20 \
-  -o ${id}.pack
+  -o vg_intermediate/${id}.pack
 
 # Variant calling
 vg call \
-  ${PANGENOME}.gbz \
-  -r ${PANGENOME}.snarls \
-  -k ${id}.pack \
+  ${PANGENOME_PATH}/${PANGENOME}.gbz \
+  -r ${PANGENOME_PATH}/HWY154_REF_4119Hap2.snarls \
+  -k vg_intermediate/${id}.pack \
   -a -A --progress\
   -t 20 -z -c 50 -C 10000000\
   -s ${id} \
-  > ${id}.vcf
+  > vg_vcf/${id}.vcf
+
+```
+## GBS Data Alignment and Variant Calling from Pangenome with VG
+
+```
+#!/bin/bash
+#SBATCH --output=/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/logs/bwamem_%A_%a.out
+#SBATCH --error=/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/logs/bwamem_%A_%a.err
+#SBATCH --time=1-00:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=24
+#SBATCH --account=gompert
+#SBATCH --partition=gompert-grn
+#SBATCH --job-name=bwamem
+#SBATCH --qos gompert-grn
+#SBATCH --array=0-1   # Job array when n is number of unique samples
+
+### LOAD MODULES ###
+#For this step, bwa and needed
+module load bwa
+
+echo "Start Job"
+echo "SLURM_ARRAY_TASK_ID = ${SLURM_ARRAY_TASK_ID}"
+
+### ASSIGN VARIABLES  ###
+P=$(find /work/dtataru/BWB/MAP/ -type d | sort | awk -v line=${SLURM_ARRAY_TASK_ID} 'line==NR')
+SAMPLE=$(echo $R1 | cut -d "/" -f 11 | cut -d "." -f 1)
+pangenome="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus_pangenome/HWY154_REF_4119Hap2/HWY154_REF_4119Hap2.sv.gfa.fa.gz"
+
+echo "R1=$R1"
+echo "SAMPLE=$SAMPLE"
+echo "pangenome=$pangenome"
+
+### SET TMPDIR ###
+WORKDIR="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/bwamem"
+cd "$WORKDIR" 
+
+### MAPPING ###
+echo "Mapping ${SAMPLE}"
+bwa mem -M -R "$pangenome" "$R1" > "${SAMPLE}.sam"
+echo "Mapping complete for ${SAMPLE}"
+
+### SAMTOOLS SORT AND FILTER ###
+#convert sam to bam
+samtools fixmate -O bam "${SAMPLE}.sam" "${SAMPLE}.bam"
+
+samtools sort -@ 12 -o "${SAMPLE}.sorted.bam" "${SAMPLE}.bam"
+samtools index "${SAMPLE}.sorted.bam"
+samtools view -b -q 20 "${SAMPLE}.sorted.bam" > "${SAMPLE}.sorted.unique.bam"
+samtools index "${SAMPLE}.sorted.unique.bam"
+
+echo "samtools done for ${SAMPLE}"
+
+```
+
+and now variant calling:
+```
+#!/bin/bash
+#SBATCH --output=/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/logs/varcall_%A_%a.out
+#SBATCH --error=/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/logs/varcall_%A_%a.err
+#SBATCH --time=1-00:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=24
+#SBATCH --account=gompert
+#SBATCH --partition=gompert-grn
+#SBATCH --job-name=varcall
+#SBATCH --qos gompert-grn
+
+### LOAD MODULES ###
+module load samtools/1.19
+module load bcftools/1.18
+eval "$(conda shell.bash hook)"
+conda activate /home/dtataru/.conda/envs/ancestryinfer
+
+### ASSIGN VARIABLES ###
+BAMS=$(find /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/bwamem/ \
+    | grep .sorted.unique.bam \
+    | sort \
+    | awk -v line=${SLURM_ARRAY_TASK_ID} 'line==NR')
+
+SAMPLE=$(echo $R1 | cut -d "/" -f 11 | cut -d "." -f 1)
+pangenome="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus_pangenome/HWY154_REF_4119Hap2/HWY154_REF_4119Hap2.sv.gfa.fa.gz"
+
+INPUTDIR="/work/dtataru/BWB/HMM_INPUT"
+OUTPUTDIR="/work/dtataru/BWB/MAP"
+THREADS=20
+
+FOCAL_CHROM_LIST="/project/dtataru/BWB/ancestryinfer/focal_chrom_list.txt"
+CHR=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$FOCAL_CHROM_LIST")
+OUTVCF="hybrids1.par1.maxdepth6000.${CHR}.vcf"
+
+### MERGE ALL BAMS FOR VARIANT CALLING ###
+echo "Merge BAM files"
+cd "$BAMDIR"
+
+for P in 1 2 3; do
+	BAM_FILES=($(find "$BAMDIR" -type f -name "*.par${P}.sorted.pass.unique.bam" | sort))
+	MERGED="${WORKDIR}/hybrids1merged.par${P}.pass.unique.bam"
+	SORTED="${WORKDIR}/hybrids1merged.par${P}.sorted.pass.unique.bam"
+
+	samtools merge -r -c -p -@ ${THREADS} "$MERGED" "${BAM_FILES[@]}"
+	samtools sort -@ 12 -o "$SORTED" "$MERGED"
+	samtools index "$SORTED"
+done
+
+echo "BAM files merged"
+
+### VARIANT CALLING ###
+echo "start variant calling"
+cd "$WORKDIR"
+
+BAM_FILE="${WORKDIR}/hybrids1merged.par1.sorted.pass.unique.bam"
+bcftools mpileup -Ou -d 6000 -r "$CHR" -f "$genome1" "$BAM_FILE" | bcftools call -m -Ov -o "$OUTVCF"
+
+echo "finished variant calling"
+
+### GENERATE HMM INPUT FILES ###
+echo "start generating hmm input"
+
+INFILE_AIMS="${OUTVCF}.aims"
+COUNTS="${OUTVCF}_counts"
+AIMS="/project/dtataru/ancestryinfer/AIMs_panel15_final.AIMs.txt"
+AIM_COUNTS="/project/dtataru/ancestryinfer/AIMs_panel15_final.AIMs_counts.txt"
+AIMS_MOD="${AIMS}.mod"
+AIMS_BED="${AIMS}.mod.bed"
+COUNTS_BED="${COUNTS}.bed"
+
+awk '!/^#/ {print $1"_"$2"\t"$0}' "$OUTVCF" > "$VCF_MOD"
+perl "${PATH_SCRIPTS}/combine_FAS_scriptome_snippet.pl" "$AIMS_MOD" "$VCF_MOD" "$INFILE_AIMS"
+perl "${PATH_SCRIPTS}/vcf_to_counts_non-colinear_DTv4.pl"  "$INFILE_AIMS" "$COUNTS"
+perl -F'_|\t' -lane 'print join("\t", $F[0], $F[1], @F[4..$#F])' "$COUNTS" > "$COUNTS_BED"
+
+
+### COUNTS TO HMM INPUT ###
+#note, vcf_counts_to_hmmv3.pl is very different from v1 and v2, written for a multi-sample file
+#sets recombination rate at beginning of chromosome to 0, output has 595 columns
+perl "${PATH_SCRIPTS}/vcf_counts_to_hmmv3.pl" "$COUNTS_BED" "$AIM_COUNTS" 0.00000002 > "${COUNTS}.hmmsites1"
+
+echo "Job Done"
 ```
 
 ## Comparison across methods
