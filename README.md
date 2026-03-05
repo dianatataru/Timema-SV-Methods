@@ -1046,6 +1046,80 @@ vg call \
   -s ${id} \
   > vg_vcf/${id}.vcf
 
+
+#possible joint variant calling
+PACK_ARGS=$(ls intermediate/*.pack | sed 's/^/-k /' | tr '\n' ' ')
+SAMPLE_ARGS=$(ls intermediate/*.pack | xargs -I{} basename {} .pack | sed 's/^/-s /' | tr '\n' ' ')
+
+vg call \
+  ${PANGENOME_PATH}/${PANGENOME}.gbz \
+  -r ${PANGENOME_PATH}/HWY154_REF_4119Hap2.snarls \
+  $PACK_ARGS \
+  -a -A --progress \
+  -t 20 -z -c 50 -C 10000000 \
+  $SAMPLE_ARGS \
+  > vcf/all_samples.vcf
+```
+
+output vcf:
+```
+##fileformat=VCFv4.2
+##FILTER=<ID=PASS,Description="All filters passed">
+##contig=<ID=Hap2_t_crist_hwy154_cen4119#2#Scaffold_4__1_contigs__length_97222829,length=97222830>
+##contig=<ID=Hap2_t_crist_hwy154_cen4119#2#Scaffold_9__2_contigs__length_79556474,length=79556476>
+##contig=<ID=Hap2_t_crist_hwy154_cen4119#2#Scaffold_1__1_contigs__length_160647932,length=160647933>
+##contig=<ID=Hap2_t_crist_hwy154_cen4119#2#Scaffold_6__1_contigs__length_78844258,length=78844259>
+##contig=<ID=Hap2_t_crist_hwy154_cen4119#2#Scaffold_13__3_contigs__length_82050896,length=82050899>
+##contig=<ID=Hap2_t_crist_hwy154_cen4119#2#Scaffold_3__2_contigs__length_137956696,length=137956698>
+##contig=<ID=Hap2_t_crist_hwy154_cen4119#2#Scaffold_2__1_contigs__length_157594471,length=157594472>
+##contig=<ID=Hap2_t_crist_hwy154_cen4119#2#Scaffold_12__1_contigs__length_47609450,length=47609451>
+##contig=<ID=Hap2_t_crist_hwy154_cen4119#2#Scaffold_11__2_contigs__length_80009992,length=80009994>
+##contig=<ID=Hap2_t_crist_hwy154_cen4119#2#Scaffold_8__1_contigs__length_71271319,length=71271320>
+##contig=<ID=Hap2_t_crist_hwy154_cen4119#2#Scaffold_7__1_contigs__length_75018798,length=75018799>
+##contig=<ID=Hap2_t_crist_hwy154_cen4119#2#Scaffold_5__1_contigs__length_83128659,length=83128660>
+##contig=<ID=Hap2_t_crist_hwy154_cen4119#2#Scaffold_10__2_contigs__length_75648701,length=75648703>
+##INFO=<ID=LV,Number=1,Type=Integer,Description="Level in the snarl tree (0=top level)">
+##INFO=<ID=PS,Number=1,Type=String,Description="ID of variant corresponding to parent snarl">
+##INFO=<ID=AT,Number=R,Type=String,Description="Allele Traversal as path in graph">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##INFO=<ID=DP,Number=1,Type=Integer,Description="Total Depth">
+##FORMAT=<ID=AD,Number=.,Type=Integer,Description="Allelic depths for the ref and alt alleles in the order listed">
+##FORMAT=<ID=MAD,Number=1,Type=Integer,Description="Minimum site allele depth">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">
+##FORMAT=<ID=GL,Number=G,Type=Float,Description="Genotype Likelihood, log10-scaled likelihoods of the data given the called genotype for each possible genotype generated from the reference and alternate alleles given the sample ploidy">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality, the Phred-scaled probability estimate of the called genotype">
+##FORMAT=<ID=GP,Number=1,Type=Float,Description="Genotype Probability, the log-scaled posterior probability of the called genotype">
+##FORMAT=<ID=XD,Number=1,Type=Float,Description="eXpected Depth, background coverage as used for the Poisson model">
+##FILTER=<ID=lowad,Description="Variant does not meet minimum allele read support threshold of 1">
+##FILTER=<ID=lowdepth,Description="Variant has read depth less than 4">
+##SAMPLE=<ID=2013FHA001>
+##contig=<ID=Scaffold_10__2_contigs__length_75648701>
+##contig=<ID=Scaffold_11__2_contigs__length_80009992>
+##contig=<ID=Scaffold_12__1_contigs__length_47609450>
+##contig=<ID=Scaffold_13__3_contigs__length_82050896>
+##contig=<ID=Scaffold_1__1_contigs__length_160647932>
+##contig=<ID=Scaffold_2__1_contigs__length_157594471>
+##contig=<ID=Scaffold_3__2_contigs__length_137956696>
+##contig=<ID=Scaffold_4__1_contigs__length_97222829>
+##contig=<ID=Scaffold_5__1_contigs__length_83128659>
+##contig=<ID=Scaffold_6__1_contigs__length_78844258>
+##contig=<ID=Scaffold_7__1_contigs__length_75018798>
+##contig=<ID=Scaffold_8__1_contigs__length_71271319>
+##contig=<ID=Scaffold_9__2_contigs__length_79556474>
+##bcftools_viewVersion=1.23-3-g34a49760+htslib-1.23-9-gacc28ac1
+##bcftools_viewCommand=view -h 2013FHA001.vcf.gz; Date=Wed Mar  4 19:32:45 2026
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	2013FHA001
+```
+bcftools +counts for same vcf:
+```
+bcftools +counts 2013FHA001.vcf.gz
+[W::bcf_hdr_check_sanity] GP should be declared as Number=G
+Number of samples: 1
+Number of SNPs:    29859
+Number of INDELs:  239728
+Number of MNPs:    36580
+Number of others:  78012
+Number of sites:   413902
 ```
 ## GBS Data Alignment and Variant Calling from Pangenome with VG
 
@@ -1114,41 +1188,27 @@ and now variant calling:
 #SBATCH --qos gompert-grn
 
 ### LOAD MODULES ###
-module load samtools/1.19
-module load bcftools/1.18
-eval "$(conda shell.bash hook)"
-conda activate /home/dtataru/.conda/envs/ancestryinfer
+module load samtools
+module load bcftools
+
 
 ### ASSIGN VARIABLES ###
-BAMS=$(find /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/bwamem/ \
-    | grep .sorted.unique.bam \
-    | sort \
-    | awk -v line=${SLURM_ARRAY_TASK_ID} 'line==NR')
-
-SAMPLE=$(echo $R1 | cut -d "/" -f 11 | cut -d "." -f 1)
+BAMDIR="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/bwamem"
+BAM_FILES=($(find "$BAMDIR" -type f -name "*.sorted.unique.bam" | sort ))
 pangenome="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus_pangenome/HWY154_REF_4119Hap2/HWY154_REF_4119Hap2.sv.gfa.fa.gz"
-
-INPUTDIR="/work/dtataru/BWB/HMM_INPUT"
-OUTPUTDIR="/work/dtataru/BWB/MAP"
+WORKDIR="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/varcall_simple"
 THREADS=20
-
-FOCAL_CHROM_LIST="/project/dtataru/BWB/ancestryinfer/focal_chrom_list.txt"
-CHR=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$FOCAL_CHROM_LIST")
-OUTVCF="hybrids1.par1.maxdepth6000.${CHR}.vcf"
+MERGED="${WORKDIR}/FHA_all.unique.bam"
+SORTED="${WORKDIR}/FHA_all.sorted.unique.bam"
+OUTVCF="FHA_all.vcf"
 
 ### MERGE ALL BAMS FOR VARIANT CALLING ###
 echo "Merge BAM files"
 cd "$BAMDIR"
 
-for P in 1 2 3; do
-	BAM_FILES=($(find "$BAMDIR" -type f -name "*.par${P}.sorted.pass.unique.bam" | sort))
-	MERGED="${WORKDIR}/hybrids1merged.par${P}.pass.unique.bam"
-	SORTED="${WORKDIR}/hybrids1merged.par${P}.sorted.pass.unique.bam"
-
-	samtools merge -r -c -p -@ ${THREADS} "$MERGED" "${BAM_FILES[@]}"
-	samtools sort -@ 12 -o "$SORTED" "$MERGED"
-	samtools index "$SORTED"
-done
+samtools merge -r -c -p -@ ${THREADS} "$MERGED" "${BAM_FILES[@]}"
+samtools sort -@ 12 -o "$SORTED" "$MERGED"
+samtools index "$SORTED"
 
 echo "BAM files merged"
 
@@ -1156,34 +1216,9 @@ echo "BAM files merged"
 echo "start variant calling"
 cd "$WORKDIR"
 
-BAM_FILE="${WORKDIR}/hybrids1merged.par1.sorted.pass.unique.bam"
-bcftools mpileup -Ou -d 6000 -r "$CHR" -f "$genome1" "$BAM_FILE" | bcftools call -m -Ov -o "$OUTVCF"
+bcftools mpileup -Ou -d 6000 -r "$CHR" -f "$pangenome" "$SORTED" | bcftools call -m -Ov -o "$OUTVCF"
 
 echo "finished variant calling"
-
-### GENERATE HMM INPUT FILES ###
-echo "start generating hmm input"
-
-INFILE_AIMS="${OUTVCF}.aims"
-COUNTS="${OUTVCF}_counts"
-AIMS="/project/dtataru/ancestryinfer/AIMs_panel15_final.AIMs.txt"
-AIM_COUNTS="/project/dtataru/ancestryinfer/AIMs_panel15_final.AIMs_counts.txt"
-AIMS_MOD="${AIMS}.mod"
-AIMS_BED="${AIMS}.mod.bed"
-COUNTS_BED="${COUNTS}.bed"
-
-awk '!/^#/ {print $1"_"$2"\t"$0}' "$OUTVCF" > "$VCF_MOD"
-perl "${PATH_SCRIPTS}/combine_FAS_scriptome_snippet.pl" "$AIMS_MOD" "$VCF_MOD" "$INFILE_AIMS"
-perl "${PATH_SCRIPTS}/vcf_to_counts_non-colinear_DTv4.pl"  "$INFILE_AIMS" "$COUNTS"
-perl -F'_|\t' -lane 'print join("\t", $F[0], $F[1], @F[4..$#F])' "$COUNTS" > "$COUNTS_BED"
-
-
-### COUNTS TO HMM INPUT ###
-#note, vcf_counts_to_hmmv3.pl is very different from v1 and v2, written for a multi-sample file
-#sets recombination rate at beginning of chromosome to 0, output has 595 columns
-perl "${PATH_SCRIPTS}/vcf_counts_to_hmmv3.pl" "$COUNTS_BED" "$AIM_COUNTS" 0.00000002 > "${COUNTS}.hmmsites1"
-
-echo "Job Done"
 ```
 
 ## Comparison across methods
