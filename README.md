@@ -978,18 +978,17 @@ New Jay paper does the following with vg deconstruct vcf output:
 
 ## GBS Data Alignment and Variant Calling from Pangenome with VG
 
-We use the Giraffe-DeepVariant workflows to align and call SVs from the GSH2-8haplotype pangenome (https://www.science.org/doi/epdf/10.1126/science.abg8871, https://github.com/vgteam/vg_wdl?tab=readme-ov-file#giraffe-deepvariant-workflow).
+We use the vg-giraffe-pack-call workflow to align and call SVs from the GSH2-8haplotype pangenome(https://link.springer.com/article/10.1186/s13059-020-1941-7#Sec12).
 
-This filter graph is made by removing nodes covered by fewer than 2 haplotypes (this value can be changed using the --filter option) from the clip graph. generally the clip graph for everything except --giraffe which defaults to the filter graph, and anything odgi-related which defaults to full. 
+Input graph is the filtered pangenome output form MinigraphCactus that has been vg autoindexed to create the .dist, .shortread.zipcodes, and .shortread.withzip.min indexes. Snarls have been identified using vg snarls. This filter graph is made by removing nodes covered by fewer than 2 haplotypes from the clip graph. The distance index (.dist) is a memory-mapped file. As of vg version 1.48.0, the file will be opened in read+write mode by default. This can cause issues in HPC clusters and other distributed environments, where multiple computers try to access the same distance index file. To avoid this, make the file read-only or use a local copy of the file (chmod 444 HWY154_REF_4119Hap2.d2.dist). Joint variant calling is not possible with vg call. Here, I make a separate vcf for each sample and then will join them all with bcftools merge. I think it is possible to take the output .gam from giraffe and surject it to make bams, and then use GATK gvcf, although it is possible this would return nonsense (https://github.com/vgteam/vg/issues/1416). 
 
-The distance index is a memory-mapped file. As of vg version 1.48.0, the file will be opened in read+write mode by default. This can cause issues in HPC clusters and other distributed environments, where multiple computers try to access the same distance index file. To avoid this, make the file read-only or use a local copy of the file.
-soft linked files:
+Output from cactus minigraph- generally the clip graph for everything except --giraffe which defaults to the filter graph, and anything odgi-related which defaults to full. 
 
+Make soft linked GBS files:
 ```
 ln -s /uufs/chpc.utah.edu/common/home/gompert-group3/data/sheffield/timema/2013fha_gwas/02_ids_reads/cristinae/2013*bz2 data/
-chmod 444 HWY154_REF_4119Hap2.d2.dist
 ```
-now run alignment and variant calling
+now run alignment and variant calling:
 
 ```
 #!/bin/bash
@@ -1046,19 +1045,6 @@ vg call \
   -s ${id} \
   > vg_vcf/${id}.vcf
 
-
-#possible joint variant calling
-PACK_ARGS=$(ls intermediate/*.pack | sed 's/^/-k /' | tr '\n' ' ')
-SAMPLE_ARGS=$(ls intermediate/*.pack | xargs -I{} basename {} .pack | sed 's/^/-s /' | tr '\n' ' ')
-
-vg call \
-  ${PANGENOME_PATH}/${PANGENOME}.gbz \
-  -r ${PANGENOME_PATH}/HWY154_REF_4119Hap2.snarls \
-  $PACK_ARGS \
-  -a -A --progress \
-  -t 20 -z -c 50 -C 10000000 \
-  $SAMPLE_ARGS \
-  > vcf/all_samples.vcf
 ```
 
 output vcf:
@@ -1121,7 +1107,10 @@ Number of MNPs:    36580
 Number of others:  78012
 Number of sites:   413902
 ```
-## GBS Data Alignment and Variant Calling from Pangenome with VG
+
+then can use bcftools merge to merge all vcfs? Do I need to rpoject this back onto snarls somehow to identify inversions? when I look at the snarls.json, there are 45265393 lines. Of those, there are 11779457 instances of the word "backward" which I think is related to the inversions because when I search one of the nodes of the inversion (9179874) it pops up in a set of parenthesis including backwards=true.
+
+## GBS Data Alignment and Variant Calling from Pangenome with standard methods
 
 ```
 #!/bin/bash
@@ -1139,13 +1128,14 @@ Number of sites:   413902
 ### LOAD MODULES ###
 #For this step, bwa and needed
 module load bwa
+module load samtools
 
 echo "Start Job"
 echo "SLURM_ARRAY_TASK_ID = ${SLURM_ARRAY_TASK_ID}"
 
 ### ASSIGN VARIABLES  ###
-P=$(find /work/dtataru/BWB/MAP/ -type d | sort | awk -v line=${SLURM_ARRAY_TASK_ID} 'line==NR')
-SAMPLE=$(echo $R1 | cut -d "/" -f 11 | cut -d "." -f 1)
+P=$(find /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/data -type f | sort | awk -v line=${SLURM_ARRAY_TASK_ID} 'line==NR')
+SAMPLE=$(echo $R1 | cut -d "/" -f 10 | cut -d "." -f 1)
 pangenome="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus_pangenome/HWY154_REF_4119Hap2/HWY154_REF_4119Hap2.sv.gfa.fa.gz"
 
 echo "R1=$R1"
@@ -1153,12 +1143,17 @@ echo "SAMPLE=$SAMPLE"
 echo "pangenome=$pangenome"
 
 ### SET TMPDIR ###
-WORKDIR="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/bwamem"
+WORKDIR="/scratch/general/nfs1/u6071015/timemaGBS/"
 cd "$WORKDIR" 
 
 ### MAPPING ###
 echo "Mapping ${SAMPLE}"
-bwa mem -M -R "$pangenome" "$R1" > "${SAMPLE}.sam"
+
+#index fasta
+samtools faidx ${pangenome}
+
+#map
+bwa mem -t 12 -M -R "$pangenome" "$R1" > "${SAMPLE}.sam"
 echo "Mapping complete for ${SAMPLE}"
 
 ### SAMTOOLS SORT AND FILTER ###
@@ -1193,10 +1188,10 @@ module load bcftools
 
 
 ### ASSIGN VARIABLES ###
-BAMDIR="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/bwamem"
+BAMDIR="/scratch/general/nfs1/u6071015/timemaGBS/"
 BAM_FILES=($(find "$BAMDIR" -type f -name "*.sorted.unique.bam" | sort ))
 pangenome="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus_pangenome/HWY154_REF_4119Hap2/HWY154_REF_4119Hap2.sv.gfa.fa.gz"
-WORKDIR="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/varcall_simple"
+WORKDIR="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/bcftools_vcf"
 THREADS=20
 MERGED="${WORKDIR}/FHA_all.unique.bam"
 SORTED="${WORKDIR}/FHA_all.sorted.unique.bam"
@@ -1216,11 +1211,38 @@ echo "BAM files merged"
 echo "start variant calling"
 cd "$WORKDIR"
 
-bcftools mpileup -Ou -d 6000 -r "$CHR" -f "$pangenome" "$SORTED" | bcftools call -m -Ov -o "$OUTVCF"
+bcftools mpileup -Ou --C 50 -d 500 -r "$CHR" -a DP,AD,ADF,ADR -q 20 -Q 30 -f "$pangenome" "$SORTED" | bcftools call -v -c -p 0.01 -P 0.001 -Ov -o "$OUTVCF"
 
 echo "finished variant calling"
 ```
 
+One thing that I'm not sure about with both this vcf and the vg vcf is how to conduct downstream filtering. I can use the filtering script that Zach used for the Science paper (vcfFilter.pl) but I'm not sure how that will do with the vg output.
+
+Now for local PCAS- there is a tutorial here that describes one way of searching the genome along windows (https://academic.oup.com/bioinformatics/article/41/10/btaf529/8261369) using program WinPCA. from that link:
+
+```
+module load bcftools
+#filter for biallelic SNPs - otherwise we run into an error:
+bcftools view -m2 -M2 -v snps ~/workshop_materials/structural_variants/SNPs/SNPs.vcf > 01_pca_haploblocks/SNPs_biallelic.vcf
+
+#lets load an adequate conda env
+conda activate winpca
+
+#make the PCAs
+#-w for window size -i for increment size --np to remove filters creating an error -v GT to precise the type of data.
+#then there are three argument "$PREFIX" "$VCF" "$REGION"
+winpca pca -w 10000 -i 10000 --np -v GT 01_pca_haploblocks/winpca_out 01_pca_haploblocks/SNPs_biallelic.vcf Chr1:1-9999999
+
+#polarize them
+winpca polarize 01_pca_haploblocks/winpca_out
+
+#plot PCs
+winpca chromplot 01_pca_haploblocks/winpca_out Chr1:1-9999999
+
+#get out of the env
+conda deactivate
+```
+ 
 ## Comparison across methods
 
 To compare the success of calling across methods, we can use sveval (https://github.com/jmonlong/sveval) with vcfs from each method, or Zhang et al. 2025 then use survivor (https://www.github.com/fritzsedlazeck/SURVIVOR; version 1.0.3) (Jeffares et al., 2017) to identify homologous SV. Here is a survivor tutorial:
