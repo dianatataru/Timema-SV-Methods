@@ -1109,16 +1109,68 @@ Number of sites:   413902
 ```
 
 then can use bcftools merge to merge all vcfs? Do I need to rpoject this back onto snarls somehow to identify inversions? when I look at the snarls.json, there are 45265393 lines. Of those, there are 11779457 instances of the word "backward" which I think is related to the inversions because when I search one of the nodes of the inversion (9179874) it pops up in a set of parenthesis including backwards=true.
+to merge vcfs:
+```
+#!/bin/bash
+#SBATCH --time=240:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=24
+#SBATCH --account=gompert
+#SBATCH --partition=gompert-grn
+#SBATCH --job-name=mergevcf
+#SBATCH --qos gompert-grn
+#SBATCH -e /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/logs/merge-%A_%a.err
+#SBATCH -o /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/logs/merge-%A_%a.out
+#SBATCH --mem=200G
 
+### load modules ###
+module load bcftools
+module load plink/2.0 
+
+cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/vg_vcf
+
+### merge and index vcfs ###
+bcftools merge *.vcf.gz -O z -threads 12 -o 2013FHA_merged.vcf.gz
+bcftools index 2013FHA_merged.vcf.gz
+
+### check missingness ###
+plink --vcf 2013FHA_merged.vcf.gz --missing --out 2013FHA_merged_missingness_report
+```
 ## GBS Data Alignment and Variant Calling from Pangenome with standard methods
+First index the pangenome:
 
+```
+#!/bin/bash
+#SBATCH --output=/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/logs/indexpangenome_%A_%a.out
+#SBATCH --error=/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/logs/indexpangenome_%A_%a.err
+#SBATCH --time=1-00:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=24
+#SBATCH --account=gompert
+#SBATCH --partition=gompert-grn
+#SBATCH --job-name=indexpangenome
+#SBATCH --qos gompert-grn
+#SBATCH --mem=200G
+
+### LOAD MODULES ###
+module load bwa
+
+### ASSIGN VARIABLES  ###
+pangenome="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus_pangenome/HWY154_REF_4119Hap2/HWY154_REF_4119Hap2.sv.gfa.fa.gz"
+echo "pangenome=$pangenome"
+
+#index fasta
+bwa index ${pangenome}
+
+```
+Then run mapping:
 ```
 #!/bin/bash
 #SBATCH --output=/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/logs/bwamem_%A_%a.out
 #SBATCH --error=/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/logs/bwamem_%A_%a.err
 #SBATCH --time=1-00:00:00
 #SBATCH --nodes=1
-#SBATCH --ntasks=24
+#SBATCH --ntasks=6
 #SBATCH --account=gompert
 #SBATCH --partition=gompert-grn
 #SBATCH --job-name=bwamem
@@ -1129,16 +1181,17 @@ then can use bcftools merge to merge all vcfs? Do I need to rpoject this back on
 #For this step, bwa and needed
 module load bwa
 module load samtools
+module load bzip2
 
 echo "Start Job"
 echo "SLURM_ARRAY_TASK_ID = ${SLURM_ARRAY_TASK_ID}"
 
 ### ASSIGN VARIABLES  ###
-P=$(find /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/data -type f | sort | awk -v line=${SLURM_ARRAY_TASK_ID} 'line==NR')
-SAMPLE=$(echo $R1 | cut -d "/" -f 10 | cut -d "." -f 1)
+P=$(find /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/data -type l | sort | awk -v line=${SLURM_ARRAY_TASK_ID} 'line==NR')
+SAMPLE=$(basename $P | cut -d "." -f 1)
 pangenome="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus_pangenome/HWY154_REF_4119Hap2/HWY154_REF_4119Hap2.sv.gfa.fa.gz"
 
-echo "R1=$R1"
+echo "P=$P"
 echo "SAMPLE=$SAMPLE"
 echo "pangenome=$pangenome"
 
@@ -1149,11 +1202,7 @@ cd "$WORKDIR"
 ### MAPPING ###
 echo "Mapping ${SAMPLE}"
 
-#index fasta
-samtools faidx ${pangenome}
-
-#map
-bwa mem -t 12 -M -R "$pangenome" "$R1" > "${SAMPLE}.sam"
+bwa mem -t 12 -R "@RG\tID:${SAMPLE}\tSM:${SAMPLE}\tPL:ILLUMINA" "$pangenome" <(bzip2 -dc "$P") > "${SAMPLE}.sam"
 echo "Mapping complete for ${SAMPLE}"
 
 ### SAMTOOLS SORT AND FILTER ###
@@ -1199,7 +1248,7 @@ OUTVCF="FHA_all.vcf"
 
 ### MERGE ALL BAMS FOR VARIANT CALLING ###
 echo "Merge BAM files"
-cd "$BAMDIR"
+cd "$WORKDIR"
 
 samtools merge -r -c -p -@ ${THREADS} "$MERGED" "${BAM_FILES[@]}"
 samtools sort -@ 12 -o "$SORTED" "$MERGED"
@@ -1218,7 +1267,7 @@ echo "finished variant calling"
 
 One thing that I'm not sure about with both this vcf and the vg vcf is how to conduct downstream filtering. I can use the filtering script that Zach used for the Science paper (vcfFilter.pl) but I'm not sure how that will do with the vg output.
 
-Now for local PCAS- there is a tutorial here that describes one way of searching the genome along windows (https://academic.oup.com/bioinformatics/article/41/10/btaf529/8261369) using program WinPCA. from that link:
+Now for local PCAS- there are a couple options. there is pcadapt (https://bcm-uga.github.io/pcadapt/articles/pcadapt.html) which will caluclate outliers. there is a tutorial here that describes one way of searching the genome along windows (https://academic.oup.com/bioinformatics/article/41/10/btaf529/8261369) using program WinPCA. from that link:
 
 ```
 module load bcftools
