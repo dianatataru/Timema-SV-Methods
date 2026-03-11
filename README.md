@@ -1265,32 +1265,263 @@ bcftools mpileup -Ou --C 50 -d 500 -r "$CHR" -a DP,AD,ADF,ADR -q 20 -Q 30 -f "$p
 echo "finished variant calling"
 ```
 
-One thing that I'm not sure about with both this vcf and the vg vcf is how to conduct downstream filtering. I can use the filtering script that Zach used for the Science paper (vcfFilter.pl) but I'm not sure how that will do with the vg output.
-
-Now for local PCAS- there are a couple options. there is pcadapt (https://bcm-uga.github.io/pcadapt/articles/pcadapt.html) which will caluclate outliers. there is a tutorial here that describes one way of searching the genome along windows (https://academic.oup.com/bioinformatics/article/41/10/btaf529/8261369) using program WinPCA. from that link:
+Now for vcf filtering using Zachs filtering scripts ```vcfFilter.pl``` and ```filterSomeMoreL.pl``` from ChumashWGS(https://github.com/zgompert/ChumashWGSmapping), edited for these samples. 
+Here is the script to run all:
 
 ```
-module load bcftools
-#filter for biallelic SNPs - otherwise we run into an error:
-bcftools view -m2 -M2 -v snps ~/workshop_materials/structural_variants/SNPs/SNPs.vcf > 01_pca_haploblocks/SNPs_biallelic.vcf
+#!/bin/bash
+#SBATCH --output=/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/logs/filter_%A_%a.out
+#SBATCH --error=/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/logs/filter_%A_%a.err
+#SBATCH --time=1-00:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=24
+#SBATCH --account=gompert
+#SBATCH --partition=gompert-grn
+#SBATCH --job-name=filter
+#SBATCH --qos gompert-grn
 
-#lets load an adequate conda env
-conda activate winpca
+### LOAD MODULES ###
+module load R
 
-#make the PCAs
-#-w for window size -i for increment size --np to remove filters creating an error -v GT to precise the type of data.
-#then there are three argument "$PREFIX" "$VCF" "$REGION"
-winpca pca -w 10000 -i 10000 --np -v GT 01_pca_haploblocks/winpca_out 01_pca_haploblocks/SNPs_biallelic.vcf Chr1:1-9999999
+cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/bcftools_vcf/
 
-#polarize them
-winpca polarize 01_pca_haploblocks/winpca_out
+#filtered the SNP set for coverage, missing data, and various tests of bias 
+perl vcfFilter.pl FHA_all.vcf 
 
-#plot PCs
-winpca chromplot 01_pca_haploblocks/winpca_out Chr1:1-9999999
+#extracted the read depth per SNP and individual from the filtered vcf files
+bcftools query -f '[%DP\t]\n' filtered2x_FHA_all.vcf | sed 's/\t$//' > depth.txt
 
-#get out of the env
-conda deactivate
+#compute depth per individual and SNP to identify SNPs and individuals to drop
+Rscript CovFilt.R
+
+#Drop those individuals
+#perl filterSomeMoreL.pl
 ```
+and the scripts within that script. here is vcfFilter.pl:
+```
+#!/usr/bin/perl
+
+use warnings;
+use strict;
+
+# this program filters a vcf file based on overall sequence coverage, number of non-reference reads, number of alleles, and reverse orientation reads
+# usage vcfFilter.pl infile.vcf
+# change the marked variables below to adjust settings
+
+#### stringency variables, edits as desired
+## 602 inds, 2x
+my $minCoverage = 1204; # minimum number of sequences; DP
+my $minAltRds = 10; # minimum number of sequences with the alternative allele; AC
+my $notFixed = 1.0; # removes loci fixed for alt; AF
+my $bqrs = 3; # Z-score base quality rank sum test; BaseQRankSum
+my $mqrs = 3; # Z-score mapping quality rank sum test; MQRankSum
+my $rprs = 3; # Z-score read position rank sum test; ReadPosRankSum
+my $mq = 30; # minimum mapping quality; MQ
+my $miss = 60; # maximum number of individuals with no data = 10%
+##### this set is for GBS
+my $d;
+
+my @line;
+
+my $in = shift(@ARGV);
+open (IN, $in) or die "Could not read the infile = $in\n";
+$in =~ m/^([a-zA-Z_0-9\-]+)\.vcf$/ or die "Failed to match the variant file\n";
+open (OUT, "> filtered2x_$1.vcf") or die "Could not write the outfile\n";
+
+my $flag = 0;
+my $cnt = 0;
+
+while (<IN>){
+	chomp;
+	$flag = 1;
+	if (m/^\#/){ ## header row, always write
+		$flag = 1;
+	}
+	elsif (m/^\S+/){ ## this is a sequence line, you migh need to edit this reg. expr. used to be (m/^Sc/){
+		$flag = 1;
+		$d = () = (m/\d\/\d:0,0,0:0/g); ## for bcftools call
+		if ($d >= $miss){
+			$flag = 0;
+			##print "fail missing : ";
+		}
+		if (m/[ACTGN]\,[ACTGN]/){ ## two alternative alleles identified
+			$flag = 0;
+			#print "fail allele : ";
+		}
+		@line = split(/\s+/,$_);
+		if(length($line[3]) > 1 or length($line[4]) > 1){
+			$flag = 0;
+			#print "fail INDEL : ";
+		}
+		m/DP=(\d+)/ or die "Syntax error, DP not found\n";
+		if ($1 < $minCoverage){
+			$flag = 0;
+			#print "fail DP : ";
+		}
+## bcftools call version
+	
+		m/DP4=\d+,\d+,(\d+),(\d+)/ or die "Syntax error DP4 not found\n";
+		if(($1 + $2) < $minAltRds){
+			$flag = 0;
+		}
+		m/AF1*=([0-9\.e\-]+)/ or die "Syntax error, AF not found\n";
+		if ($1 == $notFixed){
+			$flag = 0;
+		#	print "fail AF : ";
+		}
+
+## bcftools call verions, these are p-values, use 0.01
+		if(m/BQBZ=([0-9e\-\.]*)/){
+			if (abs($1) > $bqrs){
+				$flag = 0;
+#				print "fail BQRS : ";
+			}
+		}
+		if(m/MQBZ=([0-9e\-\.]*)/){
+			if (abs($1) > $mqrs){
+				$flag = 0;
+#				print "fail MQRS : ";
+			}
+		}
+		if(m/RPBZ=([0-9e\-\.]*)/){
+			if (abs($1) > $rprs){
+				$flag = 0;
+#				print "fail RPRS : ";
+			}
+		}
+		if(m/MQ=([0-9\.]+)/){
+			if ($1 < $mq){
+				$flag = 0;
+#				print "fail MQ : ";
+			}
+		}
+		else{
+			$flag = 0;
+			print "faile no MQ : ";
+		}
+		if ($flag == 1){
+			$cnt++; ## this is a good SNV
+		}
+	}
+	else{
+		print "Warning, failed to match the chromosome or scaffold name regular expression for this line\n$_\n";
+		$flag = 0;
+	}
+	if ($flag == 1){
+		print OUT "$_\n";
+	}
+}
+close (IN);
+close (OUT);
+
+print "Finished filtering $in\nRetained $cnt variable loci\n";
+```
+Then I will extract read depth per individual and SNP, and idenitfy which ones to drop with CovFilt.R:
+
+```
+## compute depth per individual and SNP to identify SNPs and individuals to drop
+## the idea is to get rid of low coverage individuals
+## and SNPs with either very high coverage (3SD > mean) or very high variance in coverage
+## across individuals
+
+library(data.table)
+d<-as.matrix(fread("depth.txt",header=FALSE))
+
+## mean and SD by SNP
+mnc<-apply(d,1,mean)
+sdc<-apply(d,1,sd)
+
+## CV 
+cvc<-sdc/mnc
+meancvc<-mean(cvc)
+quantcvc<-quantile(cvc,probs=c(.5,.9,.95,.99,.999,1))
+
+meanmnc3sd<-mean(mnc)+3*sd(mnc)
+mean(mnc)
+quantmnc<-quantile(mnc,probs=c(.5,.9,.95,.99,.999,1))
+
+## for SNPs, keep if CV < 1.5 and mean < 21
+keepSNPs<-as.numeric(mnc < 21 & cvc < 1.5)
+keepSNPs_mean<-mean(keepSNPs)
+keepSNPs_sum<-sum(keepSNPs)
+
+## for individuals
+
+mni<-apply(d,2,mean)
+plot(sort(mni))
+summary(mni)
+quantile(mni,probs=c(.025,.99))
+
+keepInds<-as.numeric(mni > 4 & mni < 40)
+mean(keepInds)
+sum(keepInds)
+
+cat(sprintf("meancvc=%.4f\n", meancvc))
+cat(sprintf("quantcvc=%s\n", paste(names(quantcvc), round(quantcvc, 4), sep="=", collapse=", ")))
+cat(sprintf("meanmnc3sd=%.4f\n", meanmnc3sd))
+cat(sprintf("meanmnc=%.4f\n", mean(mnc)))
+cat(sprintf("quantmnc=%s\n", paste(names(quantile(mnc, probs=c(.5,.9,.95,.99,.999,1))), 
+                                    round(quantile(mnc, probs=c(.5,.9,.95,.99,.999,1)), 4), 
+                                    sep="=", collapse=", ")))
+cat(sprintf("keepSNPs_mean=%.4f\n", mean(keepSNPs)))
+cat(sprintf("keepSNPs_sum=%d\n", sum(keepSNPs)))
+cat(sprintf("meanmni=%s\n", paste(names(summary(mni)), round(summary(mni), 4), sep="=", collapse=", ")))
+cat(sprintf("quantmni=%s\n", paste(names(quantile(mni, probs=c(.025,.99))), 
+                                    round(quantile(mni, probs=c(.025,.99)), 4), 
+                                    sep="=", collapse=", ")))
+
+write.table(file="KeepInds.txt",keepInds,row.names=FALSE,col.names=FALSE,quote=FALSE)
+write.table(file="KeepSNPs.txt",keepSNPs,row.names=FALSE,col.names=FALSE,quote=FALSE)
+```
+and here is filterSomeMoreL.pl, based on the output of CovFilt.R, which resulted in vectors of 0s and 1s for SNPs and individuals to drop. For SNPs, I used flagged SNPs to remove with a CV > (around the 99.9th percentile) and mean coverage > 3 SDs above the mean. I flagged individuals with mean coverage < (2.5th percentile) or > (a bit above the 90th percentile). Drop the SNPs first; then convert to gl format. I used the following to drop the SNPs, resulting in the morefilter* vcf files.
+
+```
+#!/usr/bin/perl
+# filter vcf files based on coverage
+
+open(IN,"KeepSNPs.txt") or die "failed initial read\n";
+while(<IN>){
+	chomp;
+	push(@keep,$_);
+}
+close(IN);
+
+
+foreach $in (@ARGV){
+	open (IN, $in) or die "Could not read the infile = $in\n";
+	$in =~ m/^([a-zA-Z0-9_]+\.vcf)$/ or die "Failed to match the variant file\n";
+	open (OUT, "> morefilter_$1") or die "Could not write the outfile\n";
+
+
+	while (<IN>){
+		chomp;
+		if (m/^\#/){ ## header row, always write
+			$flag = 1;
+		}
+		elsif (m/^Sc/){ ## this is a sequence line, you migh need to edit this reg. expr.
+			$flag = shift(@keep);
+			if ($flag == 1){
+				$cnt++; ## this is a good SNV
+			}
+		}
+		else{
+			print "Warning, failed to match the chromosome or scaffold name regular expression for this line\n$_\n";
+			$flag = 0;
+		}
+		if ($flag == 1){
+			print OUT "$_\n";
+		}
+	}
+	close (IN);
+	close (OUT);
+
+	print "Finished filtering $in\nRetained $cnt variable loci\n";
+}
+```
+
+Now for local PCAS using lostruct (https://github.com/petrelharp/local_pca?tab=readme-ov-file). First have to install lostruct:
+
+
  
 ## Comparison across methods
 
