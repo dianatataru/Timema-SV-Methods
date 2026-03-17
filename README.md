@@ -1265,6 +1265,7 @@ bcftools mpileup -Ou --C 50 -d 500 -r "$CHR" -a DP,AD,ADF,ADR -q 20 -Q 30 -f "$p
 echo "finished variant calling"
 ```
 
+### Variant Filtering
 Now for vcf filtering using Zachs filtering scripts ```vcfFilter.pl``` and ```filterSomeMoreL.pl``` from ChumashWGS(https://github.com/zgompert/ChumashWGSmapping), edited for these samples. 
 Here is the script to run all:
 
@@ -1282,20 +1283,34 @@ Here is the script to run all:
 
 ### LOAD MODULES ###
 module load R
+module load bcftools
 
 cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/bcftools_vcf/
 
+#plot stats on raw vcf
+bcftools query \
+       -f '%CHROM\t%POS\t%QUAL\t%INFO/MQBZ\t%INFO/SCBZ\t%INFO/RPBZ\t%INFO/DP\n' \
+      FHA_all.vcf > FHA_all_site_metrics.txt
+Rscript plot_histograms
+
 #filtered the SNP set for coverage, missing data, and various tests of bias 
-perl vcfFilter.pl FHA_all.vcf 
+perl vcfFilter.pl FHA_all.vcf
 
 #extracted the read depth per SNP and individual from the filtered vcf files
-bcftools query -f '[%DP\t]\n' filtered2x_FHA_all.vcf | sed 's/\t$//' > depth.txt
+bcftools query -f '[%DP\t]\n' filtered0.5x_FHA_all.vcf | sed 's/\t$//' > depth.txt
 
 #compute depth per individual and SNP to identify SNPs and individuals to drop
 Rscript CovFilt.R
 
 #Drop those individuals
-#perl filterSomeMoreL.pl
+perl filterSomeMoreL.pl filtered0.5x_FHA_all.vcf
+
+#convert to genotype likelhood file
+perl vcf2gl.pl 0.0 morefilter_0.5x_FHA_all.vcf
+
+#obtain maximum likelihood of AF using expectation-maximization algorithm written by Zach, estpEM
+estpEM -i FHA_all.gl -o FHA_all_0.5x_estpEM.txt -e 0.001 -m 50 -h 1
+
 ```
 and the scripts within that script. here is vcfFilter.pl:
 ```
@@ -1489,7 +1504,7 @@ close(IN);
 
 foreach $in (@ARGV){
 	open (IN, $in) or die "Could not read the infile = $in\n";
-	$in =~ m/^([a-zA-Z0-9_]+\.vcf)$/ or die "Failed to match the variant file\n";
+	#$in =~ m/^([a-zA-Z0-9_]+\.vcf)$/ or die "Failed to match the variant file\n";
 	open (OUT, "> morefilter_$1") or die "Could not write the outfile\n";
 
 
@@ -1498,7 +1513,7 @@ foreach $in (@ARGV){
 		if (m/^\#/){ ## header row, always write
 			$flag = 1;
 		}
-		elsif (m/^Sc/){ ## this is a sequence line, you migh need to edit this reg. expr.
+		elsif (m/^S+/){ ## this is a sequence line, you migh need to edit this reg. expr.
 			$flag = shift(@keep);
 			if ($flag == 1){
 				$cnt++; ## this is a good SNV
@@ -1518,10 +1533,81 @@ foreach $in (@ARGV){
 	print "Finished filtering $in\nRetained $cnt variable loci\n";
 }
 ```
+Then run vcf2gl.pl. The output of this (FHA_all.gl) did not have the correct number of loci in the top line of the header (should be nind nloc), so I just manually edited the .gl file to include the correct number and then ran genotype likelihood estimation with Zach program estpEM(v1). Download main_estpEM.C, func_estpEM.C, and estpEM.H to folder and compile using this code:
 
-Now for local PCAS using lostruct (https://github.com/petrelharp/local_pca?tab=readme-ov-file). First have to install lostruct:
+```
+g++ main_estpEM.C func_estpEM.C -lgsl -lgslcblas -lm -o estpEM
+```
+when running estpEM, there are a couple parameters that can be changed. 
+-e 0.001 — convergence tolerance for the EM algorithm. It stops iterating when the allele frequency change between iterations is less than 0.001. This is actually already the default, so you'd only change it if you wanted stricter (e.g. 0.0001) or looser convergence.
+-m 50 — maximum number of EM iterations before giving up. The default is 20, so this increases it to 50, giving the algorithm more chances to converge at tricky loci.
+-h 2 — tells the program that your input file has 2 extra header lines to skip (beyond the required first line that specifies the number of individuals and loci). The default is 0.
+
+Next steps from Zach's code:
+Then obtain Bayesian estiamtes of genotypes using the allele frequency priors (under assuming HW genotype frequencies as prior expectations) for both the posterior mode and mean to compare. Compile the new C programs for the empirical Bayes genotype esimates, gl2genest.c and gl2genestMax.c. 
+gcc gl2genest.c -lm -o gl2genest
+gcc gl2genestMax.c -lm -o gl2genestMax
 
 
+```
+#!/bin/bash
+#SBATCH --output=/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/logs/glgenest_%A_%a.out
+#SBATCH --error=/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/logs/glgenest_%A_%a.err
+#SBATCH --time=1-00:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=24
+#SBATCH --account=gompert
+#SBATCH --partition=gompert-grn
+#SBATCH --job-name=glgenest
+#SBATCH --qos gompert-grn
+
+cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/bcftools_vcf
+
+## posterior mode
+./gl2genestMax FHA_all_0.5x_estpEM.txt FHA_all.gl
+## posterior mean
+./gl2genest FHA_all_0.5x_estpEM.txt FHA_all.gl
+
+```
+The output files are cpntest_FHA_all.txt for the posterior mean and mlpntest_FHA_all.txt for the posterior mode. These contain 602 individuals (columns) and 5,340 SNPS (rows). 
+
+### Local PCAs to identify inversions
+Now for local PCAS using lostruct (https://github.com/petrelharp/local_pca?tab=readme-ov-file). Takes the output mean genotype likelihood file from last step
+
+lostruct.R:
+```
+library(data.table)
+devtools::install_github("petrelharp/local_pca/lostruct")
+library(lostruct)
+
+# read the cpntest output (loci x individuals)
+coded <- as.matrix(read.table("cpntest_FHA_all.txt"))
+eigenstuff <- eigen_windows(coded, win=100, k=2)
+windist <- pc_dist(eigenstuff, npc=2 )
+fit2d <- cmdscale(windist, eig=TRUE, k=2 )
+plot( fit2d$points, xlab="Coordinate 1", ylab="Coordinate 2", col=rainbow(1.2*nrow(windist)) )
+
+```
+run_lostruct.sh
+```
+#!/bin/bash
+#SBATCH --output=/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/logs/lostruct_%A_%a.out
+#SBATCH --error=/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/logs/lostruct_%A_%a.err
+#SBATCH --time=1-00:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=24
+#SBATCH --account=gompert
+#SBATCH --partition=gompert-grn
+#SBATCH --job-name=lostruct
+#SBATCH --qos gompert-grn
+
+module load R
+
+cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/bcftools_vcf
+
+Rscript lostruct.R
+
+```
  
 ## Comparison across methods
 
