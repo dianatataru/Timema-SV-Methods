@@ -1577,8 +1577,9 @@ Now for local PCAS using lostruct (https://github.com/petrelharp/local_pca?tab=r
 lostruct.R:
 ```
 library(data.table)
-devtools::install_github("petrelharp/local_pca/lostruct")
+#devtools::install_github("petrelharp/local_pca/lostruct")
 library(lostruct)
+library(ggplot2)
 
 # read the cpntest output (loci x individuals)
 coded <- as.matrix(read.table("cpntest_FHA_all.txt"))
@@ -1587,6 +1588,83 @@ windist <- pc_dist(eigenstuff, npc=2 )
 fit2d <- cmdscale(windist, eig=TRUE, k=2 )
 plot( fit2d$points, xlab="Coordinate 1", ylab="Coordinate 2", col=rainbow(1.2*nrow(windist)) )
 
+#flag outlier windows with MDS values beyond 4 standard deviations from the mean, Huang et al. (2020)
+#Adjacent clusters with fewer than 20 windows between them are pooled, and clusters with fewer than 5 windows are discarded.
+
+mds_points <- fit2d$points
+colnames(mds_points) <- c("MDS1", "MDS2")
+
+# Build a dataframe with window index and MDS coords (track if windows were dropped)
+na_wins <- which(is.na(windist[,1]))
+win_index <- (1:nrow(windist))
+if(length(na_wins) > 0) win_index <- win_index[-na_wins]
+
+mds_df <- data.frame(
+  win_index = win_index,
+  MDS1 = mds_points[,1],
+  MDS2 = mds_points[,2]
+)
+
+# Flag outliers at 4 SD on each axis
+flag_outliers <- function(x, thresh = 4) {
+  abs(x - mean(x, na.rm=TRUE)) > thresh * sd(x, na.rm=TRUE)
+}
+
+mds_df$out_MDS1 <- flag_outliers(mds_df$MDS1)
+mds_df$out_MDS2 <- flag_outliers(mds_df$MDS2)
+
+cat("Outlier windows on MDS1:", sum(mds_df$out_MDS1), "\n")
+cat("Outlier windows on MDS2:", sum(mds_df$out_MDS2), "\n")
+
+#map windows to genomic positions
+positions <- data.frame(do.call(rbind, strsplit(rownames(coded), "_")))
+
+# Each window of 100 SNPs — get start/end position for each window
+n_snps   <- nrow(coded)
+win_size <- 100
+n_wins   <- floor(n_snps / win_size)
+
+win_coords <- data.frame(
+  win_index = 1:n_wins,
+  chrom     = positions$chrom[ seq(1, n_wins * win_size, by = win_size) ],
+  start_pos = positions$pos[   seq(1, n_wins * win_size, by = win_size) ],
+  end_pos   = positions$pos[   seq(win_size, n_wins * win_size, by = win_size) ],
+  mid_pos   = rowMeans(cbind(
+    positions$pos[ seq(1,        n_wins * win_size, by = win_size) ],
+    positions$pos[ seq(win_size, n_wins * win_size, by = win_size) ]
+  ))
+)
+
+# Merge with MDS results
+mds_df <- merge(mds_df, win_coords, by = "win_index")
+
+# plot MDS 1
+ggplot(mds_df, aes(x = mid_pos / 1e6, y = MDS1, color = out_MDS1)) +
+  geom_point(size = 1.5, alpha = 0.8) +
+  scale_color_manual(values = c("grey60", "firebrick"),
+                     labels = c("normal", "outlier")) +
+  geom_hline(yintercept = mean(mds_df$MDS1) + 4*sd(mds_df$MDS1),
+             linetype = "dashed", color = "red", linewidth = 0.5) +
+  geom_hline(yintercept = mean(mds_df$MDS1) - 4*sd(mds_df$MDS1),
+             linetype = "dashed", color = "red", linewidth = 0.5) +
+  facet_wrap(~chrom, scales = "free_x") +  # one panel per chromosome
+  theme_classic() +
+  labs(x = "Position (Mb)", y = "MDS1", color = "",
+       title = "Outlier windows — MDS1")
+
+# plot MDS 2
+ggplot(mds_df, aes(x = mid_pos / 1e6, y = MDS2, color = out_MDS2)) +
+  geom_point(size = 1.5, alpha = 0.8) +
+  scale_color_manual(values = c("grey60", "firebrick"),
+                     labels = c("normal", "outlier")) +
+  geom_hline(yintercept = mean(mds_df$MDS2) + 4*sd(mds_df$MDS2),
+             linetype = "dashed", color = "red", linewidth = 0.5) +
+  geom_hline(yintercept = mean(mds_df$MDS2) - 4*sd(mds_df$MDS2),
+             linetype = "dashed", color = "red", linewidth = 0.5) +
+  facet_wrap(~chrom, scales = "free_x") +  # one panel per chromosome
+  theme_classic() +
+  labs(x = "Position (Mb)", y = "MDS2", color = "",
+       title = "Outlier windows — MDS2")
 ```
 run_lostruct.sh
 ```
@@ -1607,6 +1685,50 @@ cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/
 
 Rscript lostruct.R
 
+```
+inspect candidate regions in R:
+
+```
+# Define candidate region coordinates (from the plot above)
+candidate_chrom <- "chr1"
+candidate_start <- 10e6
+candidate_end   <- 25e6
+
+# Get the SNP indices within this region
+candidate_snps <- which(
+  positions$chrom == candidate_chrom &
+  positions$pos   >= candidate_start &
+  positions$pos   <= candidate_end
+)
+
+# Subset the coded matrix to just those SNPs
+region_matrix <- coded[candidate_snps, ]
+
+# PCA on individuals (transpose: individuals x SNPs)
+region_pca <- prcomp(t(region_matrix), center = TRUE, scale. = FALSE)
+
+# Plot 
+plot(region_pca$x[,1], region_pca$x[,2],
+     pch = 19, col = "steelblue",
+     xlab = "PC1", ylab = "PC2",
+     main = paste("Local PCA:", candidate_chrom,
+                  round(candidate_start/1e6,1), "-",
+                  round(candidate_end/1e6,1), "Mb"))
+
+# K-means to assign putative genotype classes
+km <- kmeans(region_pca$x[,1:2], centers = 3, nstart = 25)
+table(km$cluster)
+
+# Re-plot colored by inferred genotype
+plot(region_pca$x[,1], region_pca$x[,2],
+     pch = 19,
+     col = c("steelblue","firebrick","forestgreen")[km$cluster],
+     xlab = "PC1", ylab = "PC2",
+     main = "3-cluster inversion signature?")
+legend("topright",
+       legend = c("Hom. standard","Heterokaryotype","Hom. inverted"),
+       col    = c("steelblue","firebrick","forestgreen"),
+       pch    = 19)
 ```
  
 ## Comparison across methods
