@@ -6,8 +6,8 @@ Starting off with making pangenomes with 1) 4 hwy154 genomes and 2) 8 genomes (4
 
 |  POP  | STRIPE |   ID  | SHORT |HAP|    SCIENCE BOUNDS    |
 |-------|--------|-------|-------|---|----------------------|
-|HWY154 |striped |cen4119| H GS  | 2 |24,457,103–39,030,359 |
-|HWY154 |  green |cen4280| H GUS | 1 |24,803,527–44,121,870 |
+|HWY154 |striped |cen4119| H GS  | 1 |24,457,103–39,030,359 |
+|HWY154 |  green |cen4280| H GUS | 2 |24,803,527–44,121,870 |
 |REFUGIO|striped |cen4122| R GS  | 1 |22,442,098–65,729,704 |
 |REFUGIO|  green |cen4120| R GUS | 1 |22,220,178–65,829,835 |
 
