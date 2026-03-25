@@ -536,7 +536,16 @@ sort -k6,6 -k8,8n t_crist_refug_cen4122_hap1_scaff4_inversions.paf > t_crist_ref
 paftools.js call t_crist_refug_cen4122_hap1_scaff4_inversions.srt.paf > t_crist_refug_cen4122_hap1_scaff4_inversions.srt.paf.txt
 
 ```
+### Projected pantree output back in 4119Hap2 coordinate space
 
+```
+alloc --time=10:00:00 --ntasks 24 --nodes=1 --account=gompert --partition=gompert-grn --qos=gompert-grn --mem=100G
+module load cactus/3.0.1
+vg index -x Scaffold_13__3_contigs__length_82050896.xg Scaffold_13__3_contigs__length_82050896.vg
+vg find -x Scaffold_13__3_contigs__length_82050896.xg -n 2993340 -P Hap2_t_crist_hwy154_cen4119#2#Scaffold_13__3_contigs__length_82050896
+#first number listed is node and second number is position on that path
+
+```
 ### Genome Annotation and GENESPACE visualization
 
 We can use the genespace visualization to validate the inversions and translocations found.
