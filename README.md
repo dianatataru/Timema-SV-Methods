@@ -1643,6 +1643,8 @@ module load bcftools
 bcftools query -l  morefilter_2x_FHA_all_v2.vcf | xargs -I{} basename {} .sorted.unique.bam > new_samples.txt
 bcftools reheader -s new_samples.txt -o morefilt_rehead_2x_FHA_all_v2.vcf morefilter_2x_FHA_all_v2.vcf
 bcftools query -l morefilt_rehead_2x_FHA_all_v2.vcf
+bcftools query -f '%CHROM\t%POS\n' morefilt_rehead_2x_FHA_all_v2.vcf | sed 's/.*|s//' > positions.txt
+
 ```
 Then run vcf2gl.pl. The output of this (FHA_all.gl) did not have the correct number of loci in the top line of the header (should be nind nloc), so I just manually edited the .gl file to include the correct number (602 FHA_all.gl  )and then ran genotype likelihood estimation with Zach program estpEM(v1). Download main_estpEM.C, func_estpEM.C, and estpEM.H to folder and compile using this code:
 
@@ -1683,7 +1685,7 @@ cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/
 The output files are cpntest_FHA_all.txt for the posterior mean and mlpntest_FHA_all.txt for the posterior mode. These contain 602 individuals (columns) and 5,340 SNPS (rows). 
 
 ### Local PCAs to identify inversions
-Now for local PCAS using lostruct (https://github.com/petrelharp/local_pca?tab=readme-ov-file). Takes the output mean genotype likelihood file from last step
+Now for local PCAS using lostruct (https://github.com/petrelharp/local_pca?tab=readme-ov-file). Takes the output mean genotype likelihood file from last step.
 
 lostruct.R:
 ```
