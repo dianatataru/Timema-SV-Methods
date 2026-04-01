@@ -1279,13 +1279,12 @@ Then run mapping:
 #SBATCH --partition=gompert-grn
 #SBATCH --job-name=bwamem
 #SBATCH --qos gompert-grn
-#SBATCH --array=0-1   # Job array when n is number of unique samples
+#SBATCH --array=1-602   # Job array when n is number of unique samples
 
 ### LOAD MODULES ###
 #For this step, bwa and needed
 module load bwa
 module load samtools
-module load bzip2
 
 echo "Start Job"
 echo "SLURM_ARRAY_TASK_ID = ${SLURM_ARRAY_TASK_ID}"
@@ -1294,31 +1293,28 @@ echo "SLURM_ARRAY_TASK_ID = ${SLURM_ARRAY_TASK_ID}"
 P=$(find /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/data -type l | sort | awk -v line=${SLURM_ARRAY_TASK_ID} 'line==NR')
 SAMPLE=$(basename $P | cut -d "." -f 1)
 pangenome="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus_pangenome/HWY154_REF_4119Hap2/HWY154_REF_4119Hap2.sv.gfa.fa.gz"
-
+genome="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap2.fasta.masked"
 echo "P=$P"
 echo "SAMPLE=$SAMPLE"
 echo "pangenome=$pangenome"
+echo "genome=$genome"
 
 ### SET TMPDIR ###
 WORKDIR="/scratch/general/nfs1/u6071015/timemaGBS/"
-cd "$WORKDIR" 
+cd "$WORKDIR"
 
 ### MAPPING ###
 echo "Mapping ${SAMPLE}"
 
-bwa mem -t 12 -R "@RG\tID:${SAMPLE}\tSM:${SAMPLE}\tPL:ILLUMINA" "$pangenome" <(bzip2 -dc "$P") > "${SAMPLE}.sam"
-echo "Mapping complete for ${SAMPLE}"
-
-### SAMTOOLS SORT AND FILTER ###
-#convert sam to bam
-samtools fixmate -O bam "${SAMPLE}.sam" "${SAMPLE}.bam"
-
-samtools sort -@ 12 -o "${SAMPLE}.sorted.bam" "${SAMPLE}.bam"
-samtools index "${SAMPLE}.sorted.bam"
-samtools view -b -q 20 "${SAMPLE}.sorted.bam" > "${SAMPLE}.sorted.unique.bam"
+#replicated Science paper
+bwa aln -n 4 -k 2 -l 20 -q 10 "$genome" <(bzcat "$P") > "${SAMPLE}_aligned.sai"
+bwa samse "$genome" "${SAMPLE}_aligned.sai"  <(bzcat "$P") | \
+    samtools view -bS -q 1 - | \
+    samtools sort - > "${SAMPLE}.sorted.unique.bam"
 samtools index "${SAMPLE}.sorted.unique.bam"
 
-echo "samtools done for ${SAMPLE}"
+echo "Mapping complete for ${SAMPLE}"
+
 
 ```
 
@@ -1334,29 +1330,32 @@ and now variant calling:
 #SBATCH --partition=gompert-grn
 #SBATCH --job-name=varcall
 #SBATCH --qos gompert-grn
+#SBATCH --mem=400G
 
 ### LOAD MODULES ###
-module load samtools
-module load bcftools
-
+module load samtools/1.16
+module load bcftools/1.16
+#ran previously with bcftools/1.23
 
 ### ASSIGN VARIABLES ###
 BAMDIR="/scratch/general/nfs1/u6071015/timemaGBS/"
 BAM_FILES=($(find "$BAMDIR" -type f -name "*.sorted.unique.bam" | sort ))
 pangenome="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus_pangenome/HWY154_REF_4119Hap2/HWY154_REF_4119Hap2.sv.gfa.fa.gz"
+genome="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap2.fasta.masked"
 WORKDIR="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/bcftools_vcf"
-THREADS=20
-MERGED="${WORKDIR}/FHA_all.unique.bam"
-SORTED="${WORKDIR}/FHA_all.sorted.unique.bam"
-OUTVCF="FHA_all.vcf"
+THREADS=12
+MERGED="${WORKDIR}/FHA_all_oneref.unique.bam"
+SORTED="${WORKDIR}/FHA_all_oneref.sorted.unique.bam"
+OUTVCF="FHA_all_oneref.vcf"
 
 ### MERGE ALL BAMS FOR VARIANT CALLING ###
 echo "Merge BAM files"
 cd "$WORKDIR"
 
-samtools merge -r -c -p -@ ${THREADS} "$MERGED" "${BAM_FILES[@]}"
-samtools sort -@ 12 -o "$SORTED" "$MERGED"
-samtools index "$SORTED"
+#samtools merge -f -r -c -p -@ ${THREADS} "$MERGED" "${BAM_FILES[@]}"
+#samtools sort -@ 12 -o "$SORTED" "$MERGED"
+#samtools index "$SORTED"
+#samtools flagstat "$SORTED"
 
 echo "BAM files merged"
 
@@ -1364,7 +1363,9 @@ echo "BAM files merged"
 echo "start variant calling"
 cd "$WORKDIR"
 
-bcftools mpileup -Ou --C 50 -d 500 -r "$CHR" -a DP,AD,ADF,ADR -q 20 -Q 30 -f "$pangenome" "$SORTED" | bcftools call -v -c -p 0.01 -P 0.001 -Ov -o "$OUTVCF"
+#same commands as science paper
+bcftools mpileup -Ou -d 500 -a DP,AD,ADF,ADR -Q 30 -q 20 --skip-indels -f "$genome" "${BAM_FILES[@]}" | \
+    bcftools call -v -c -p 0.01 -P 0.001 -Ov -o "$OUTVCF"
 
 echo "finished variant calling"
 ```
