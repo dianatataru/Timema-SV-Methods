@@ -1241,6 +1241,16 @@ bcftools index 2013FHA_merged.vcf.gz
 plink --vcf 2013FHA_merged.vcf.gz --missing --out 2013FHA_merged_missingness_report
 ```
 ## GBS Data Alignment and Variant Calling from Pangenome with standard methods
+
+I will be using both GBS data from HWY 154 and Refugio to quantify inversions using a local pca approach. This is the same data from the 2025 Science paper.
+
+602 FHA individuals located:
+/uufs/chpc.utah.edu/common/home/gompert-group3/data/sheffield/timema/2013fha_gwas/02_ids_reads/cristinae/2013*bz2
+
+238 Refugio individuals located:
+/uufs/chpc.utah.edu/common/home/gompert-group4/data/timema/clines/2016_gwas_trad_Patrik_clines/parsed/16*fastq
+
+ln -s /uufs/chpc.utah.edu/common/home/gompert-group4/data/timema/clines/2016_gwas_trad_Patrik_clines/parsed/16*fastq /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/REF_data/
 First index the pangenome:
 
 ```
@@ -1710,6 +1720,8 @@ The output files are cpntest_FHA_all.txt for the posterior mean and mlpntest_FHA
 
 ### Local PCAs to identify inversions with Lostruct
 Now for local PCAS using lostruct (https://github.com/petrelharp/local_pca?tab=readme-ov-file). Takes the output mean genotype likelihood file from last step.
+This also requires a positions.txt file, created with this code:
+bcftools query -f '%CHROM\t%POS\n' morefilt_rehead_2x_FHA_all_oneref_v2.vcf | sed 's/.*|s//' > positions.txt
 
 lostruct.R:
 ```
@@ -2071,50 +2083,8 @@ cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/
 Rscript lostruct.R
 
 ```
-inspect candidate regions in R:
 
-```
-# Define candidate region coordinates (from the plot above)
-candidate_chrom <- "chr1"
-candidate_start <- 10e6
-candidate_end   <- 25e6
 
-# Get the SNP indices within this region
-candidate_snps <- which(
-  positions$chrom == candidate_chrom &
-  positions$pos   >= candidate_start &
-  positions$pos   <= candidate_end
-)
-
-# Subset the coded matrix to just those SNPs
-region_matrix <- coded[candidate_snps, ]
-
-# PCA on individuals (transpose: individuals x SNPs)
-region_pca <- prcomp(t(region_matrix), center = TRUE, scale. = FALSE)
-
-# Plot 
-plot(region_pca$x[,1], region_pca$x[,2],
-     pch = 19, col = "steelblue",
-     xlab = "PC1", ylab = "PC2",
-     main = paste("Local PCA:", candidate_chrom,
-                  round(candidate_start/1e6,1), "-",
-                  round(candidate_end/1e6,1), "Mb"))
-
-# K-means to assign putative genotype classes
-km <- kmeans(region_pca$x[,1:2], centers = 3, nstart = 25)
-table(km$cluster)
-
-# Re-plot colored by inferred genotype
-plot(region_pca$x[,1], region_pca$x[,2],
-     pch = 19,
-     col = c("steelblue","firebrick","forestgreen")[km$cluster],
-     xlab = "PC1", ylab = "PC2",
-     main = "3-cluster inversion signature?")
-legend("topright",
-       legend = c("Hom. standard","Heterokaryotype","Hom. inverted"),
-       col    = c("steelblue","firebrick","forestgreen"),
-       pch    = 19)
-```
 ### K means clustering for ancestry
 
 ```
