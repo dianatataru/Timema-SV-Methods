@@ -641,6 +641,53 @@ done
 echo "Done. Output in inversion_coordinates.tsv"
 
 ```
+
+And then to get the allele length and genotype information from each of the vcfs:
+
+```
+#!/bin/bash
+#SBATCH --time=72:00:00
+#SBATCH --nodes=1
+#SBATCH -n 24
+#SBATCH --account=gompert
+#SBATCH --partition=gompert-grn
+#SBATCH --qos gompert-grn
+#SBATCH --job-name=summarizelengths
+#SBATCH -e /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/logs/summarizelengthsgenos%j.err
+#SBATCH -o /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/logs/summarizelengthsgenos-%j.out
+
+module load bcftools
+
+FIRST=1
+
+for vcf in *_pantree_inversions_only.vcf.gz; do
+    scaffold=$(basename "$vcf" .vcf.gz | sed 's/_pantree_inversions_only//')
+
+    SAMPLES=$(bcftools query -l "$vcf" \
+      | grep 't_crist' \
+      | grep -v 'MINIGRAPH' \
+      | tr '\n' ',' \
+      | sed 's/,$//')
+
+    if [[ -z "$SAMPLES" ]]; then
+        echo "WARNING: no t_crist samples found in $vcf, skipping" >&2
+        continue
+    fi
+
+    if [[ $FIRST -eq 1 ]]; then
+        # Print header on first VCF only
+        bcftools query -s "$SAMPLES" -H \
+          -f '%ID\t%INFO/RC\t%INFO/AC\t%INFO/TP\t%INFO/NIA\t%INFO/AN[\t%GT]\n' \
+          "$vcf"
+        FIRST=0
+    else
+        # No header for subsequent VCFs
+        bcftools query -s "$SAMPLES" \
+          -f '%ID\t%INFO/RC\t%INFO/AC\t%INFO/TP\t%INFO/NIA\t%INFO/AN[\t%GT]\n' \
+          "$vcf"
+    fi
+done > all_scaffolds_inversions_tcrist_genotypes.tsv
+```
 ### Genome Annotation and GENESPACE visualization
 
 We can use the genespace visualization to validate the inversions and translocations found.
