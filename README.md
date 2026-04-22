@@ -686,7 +686,32 @@ for vcf in *_pantree_inversions_only.vcf.gz; do
           -f '%ID\t%INFO/RC\t%INFO/AC\t%INFO/TP\t%INFO/NIA\t%INFO/AN[\t%GT]\n' \
           "$vcf"
     fi
-done > all_scaffolds_inversions_tcrist_genotypes.tsv
+done > all_scaffolds_inversions_tcrist_genotypes_allNR.tsv
+
+awk 'BEGIN{OFS="\t"}
+  NR==1 {
+    # Fix header: remove NR col (8), rename NR_count col (9)
+    for (i=1; i<=NF; i++) {
+      if (i==8) continue
+      if (i==9) printf "NR_bp"
+      else printf "%s", $i
+      if (i!=NF) printf "\t"
+    }
+    printf "\n"
+    next
+  }
+  {
+    nr_val = $8
+    nr_bp = (nr_val == ".") ? 0 : length(nr_val)
+    for (i=1; i<=NF; i++) {
+      if (i==8) continue
+      if (i==9) printf "%s", nr_bp
+      else printf "%s", $i
+      if (i!=NF) printf "\t"
+    }
+    printf "\n"
+  }
+' all_scaffolds_inversions_tcrist_genotypes_allNR.tsv > all_scaffolds_inversions_tcrist_genotypes_NRbp.tsv
 ```
 ### Genome Annotation and GENESPACE visualization
 
