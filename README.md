@@ -2203,7 +2203,56 @@ write.table(round(ldak6$posterior,5),file="FHA_ldak6.txt",quote=F,row.names=F,co
 
 
 ```
- 
+## WHole genome assembly Pairwise comparison with syRI
+
+### install
+```
+conda activate syRI
+conda install python=3.5
+conda install cython numpy scipy pandas=0.23.4 biopython psutil matplotlib=3.0.0 # did not work because of   - matplotlib=3.0.0*
+conda install -c conda-forge python-igraph 
+conda install -c bioconda pysam 
+conda install -c bioconda longestrunsubsequence 
+```
+
+### prepare fasta files
+from documentation (https://schneebergerlab.github.io/syri/pipeline.html): Ideally, syri expects that the homologous chromosomes in the two genomes would have exactly same chromosome id. Therefore, it is recommended that the user pre-processes the fasta files to ensure that homologous chromosomes have exactly the same id in both fasta files corresponding to the two genomes. In case, that is not the case, syri would try to find homologous genomes using whole genome alignments, but that method is heuristical and can result in suboptimal results. Also, it is recommended that the two genomes (fasta files) should have same number of chromosomes.
+
+```
+#rename
+
+#unzip
+gzip -df genome1.fna.gz
+gzip -df genome2.fna.gz
+
+#softlink with new name
+ln -sf genome1.fna refgenome
+ln -sf genome2.fna qrygenome
+
+```
+### example SyRI pipeline
+```
+#set paths
+cwd="."     # Change to working directory
+PATH_TO_SYRI="../syri/bin/syri" #Change the path to point to syri executable
+PATH_TO_PLOTSR="../syri/bin/plotsr" #Change the path to point to plotsr executable
+
+#perform whole genome alignment
+minimap2 -ax asm5 --eqx refgenome qrygenome > out.sam
+
+#runSyRI
+python3 $PATH_TO_SYRI -c out.sam -r refgenome -q qrygenome -k -F S
+
+#Plotting genomic structures predicted by SyRI
+python3 $PATH_TO_PLOTSR syri.out refgenome qrygenome -H 8 -W 5
+
+#Using SyRI to identify genomic rearrangements from whole-genome alignments generated using MUMmer
+nucmer --maxmatch -c 100 -b 500 -l 50 refgenome qrygenome       # Whole genome alignment. Any other alignment can also be used.
+delta-filter -m -i 90 -l 100 out.delta > out.filtered.delta     # Remove small and lower quality alignments
+show-coords -THrd out.filtered.delta > out.filtered.coords      # Convert alignment information to a .TSV format as required by SyRI
+python3 $PATH_TO_SYRI -c out.filtered.coords -d out.filtered.delta -r refgenome -q qrygenome
+python3 $PATH_TO_PLOTSR syri.out refgenome qrygenome -H 8 -W 5
+```
 ## Comparison across methods
 
 To compare the success of calling across methods, we can use sveval (https://github.com/jmonlong/sveval) with vcfs from each method, or Zhang et al. 2025 then use survivor (https://www.github.com/fritzsedlazeck/SURVIVOR; version 1.0.3) (Jeffares et al., 2017) to identify homologous SV. Here is a survivor tutorial:
