@@ -2311,6 +2311,29 @@ To run it:
 ```
 python3 rename_fasta_headers.py
 ```
+then I want to fuse the chromosomes 3&4 in the reference to match the three fused haplotypes. I believe the orienation is like this, 3 different version os fhte reference GSH2:
+RGUS1 version: Chr3 + Chr 4 fused
+RGUS2 version: Chr4 + Chr3 fused
+RGS2: Chr4+Chr3 reversed
+
+length chr 3 (HGS2): 137956696
+length chr 4 (HGS2): 97222829
+length chr1 (RGS2): 318039304
+length chr1 (RGUS1): 320397043
+length chr1(RGUS2): 322377046
+
+# HGS1 - Chr3 is Scaffold_3, Chr4 is Scaffold_4
+grep "^>Scaffold_3__\|^>Scaffold_4__" t_crist_hwy154_cen4119_hap1.fasta.masked.fai
+>Scaffold_3__2_contigs__length_157762941
+>Scaffold_4__1_contigs__length_83123752
+
+# HGUS1 - Chr3 is Scaffold_16, Chr4 is Scaffold_64
+grep "^>Scaffold_16__\|^>Scaffold_64__" t_crist_hwy154_cen4280_hap1.fasta.masked.fai
+
+# HGUS2 - Chr3 is Scaffold_3, Chr4 is Scaffold_35
+grep "^>Scaffold_3\|^>Scaffold_35" t_crist_hwy154_cen4280_hap2.fasta.masked | head
+
+and then some check for synteny with progressive cactus.
 
 ### example SyRI pipeline
 ```
@@ -2357,6 +2380,8 @@ show-coords -THrd ${OUT}.filtered.delta > ${OUT}.filtered.coords      # Convert 
 python3 $PATH_TO_SYRI -c ${OUT}.filtered.coords -d ${OUT}.filtered.delta -r ${REFGENOME} -q ${QRYGENOME}
 python3 $PATH_TO_PLOTSR ${OUT}_syri.out refgenome qrygenome -H 8 -W 5
 ```
+
+
 ## Comparison across methods
 
 To compare the success of calling across methods, we can use sveval (https://github.com/jmonlong/sveval) with vcfs from each method, or Zhang et al. 2025 then use survivor (https://www.github.com/fritzsedlazeck/SURVIVOR; version 1.0.3) (Jeffares et al., 2017) to identify homologous SV. Here is a survivor tutorial:
