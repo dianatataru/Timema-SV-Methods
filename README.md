@@ -2208,19 +2208,20 @@ write.table(round(ldak6$posterior,5),file="FHA_ldak6.txt",quote=F,row.names=F,co
 ### install
 ```
 conda activate syRI
-conda install python=3.5
-conda install cython numpy scipy pandas=0.23.4 biopython psutil
-conda install -c defaults matplotlib=3.0.0
+conda install python=3.11
+conda install cython numpy scipy pandas biopython psutil matplotlib
 conda install -c conda-forge python-igraph 
 conda install -c bioconda pysam 
-conda install -c bioconda longestrunsubsequence 
+conda install -c bioconda longestrunsubsequence
+conda install -c bioconda syri
+
 ```
 
 ### prepare fasta files
 from documentation (https://schneebergerlab.github.io/syri/pipeline.html): Ideally, syri expects that the homologous chromosomes in the two genomes would have exactly same chromosome id. Therefore, it is recommended that the user pre-processes the fasta files to ensure that homologous chromosomes have exactly the same id in both fasta files corresponding to the two genomes. In case, that is not the case, syri would try to find homologous genomes using whole genome alignments, but that method is heuristical and can result in suboptimal results. Also, it is recommended that the two genomes (fasta files) should have same number of chromosomes.
 
-pthon script to rename based on table from science:
-'''
+python script to rename based on table from science:
+```
 #!/usr/bin/env python3
 """
 Rename fasta scaffold headers to homologous chromosome IDs for SyRI.
@@ -2305,43 +2306,56 @@ for filename, (genome_name, col_idx) in GENOMES.items():
 
 print("All genomes processed.")
 print(f"Renamed fastas are in: {OUTPUT_DIR}")
-'''
+```
 To run it:
 ```
-#rename
 python3 rename_fasta_headers.py
-
-#unzip
-gzip -df genome1.fna.gz
-gzip -df genome2.fna.gz
-
-#softlink with new name
-ln -sf genome1.fna refgenome
-ln -sf genome2.fna qrygenome
-
 ```
+
 ### example SyRI pipeline
 ```
+#!/bin/bash
+#SBATCH --time=72:00:00
+#SBATCH --nodes=1
+#SBATCH -n 24
+#SBATCH --mem=100G
+#SBATCH --account=gompert
+#SBATCH --partition=gompert-grn
+#SBATCH --qos=gompert-grn
+#SBATCH --job-name=syri
+#SBATCH -e /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/logs/syri-%j.err
+#SBATCH -o /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/logs/syri-%j.out
+
+module load miniforge3
+conda activate syRI
+
 #set paths
-cwd="."     # Change to working directory
-PATH_TO_SYRI="../syri/bin/syri" #Change the path to point to syri executable
-PATH_TO_PLOTSR="../syri/bin/plotsr" #Change the path to point to plotsr executable
+cwd="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/syri" 
+PATH_TO_SYRI="/uufs/chpc.utah.edu/common/home/u6071015/.conda/envs/syRI/syri/bin/syri" 
+PATH_TO_PLOTSR="/uufs/chpc.utah.edu/common/home/u6071015/.conda/envs/syRI/syri/bin/plotsr" 
+REFGENOME="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/renamed/t_crist_hwy154_cen4119_hap2.fasta.masked"
+QRYGENOME="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/renamed/t_crist_hwy154_cen4119_hap1.fasta.masked"
+OUT="syri_TcrGSH2_TcrGSH1"
 
 #perform whole genome alignment
-minimap2 -ax asm5 --eqx refgenome qrygenome > out.sam
+minimap2 -ax asm5 --eqx ${REFGENOME} ${QRYGENOME} > ${OUT}.sam
 
-#runSyRI
-python3 $PATH_TO_SYRI -c out.sam -r refgenome -q qrygenome -k -F S
+#runSyRI, -k means keep intermediate files, -F is input format, .sam
+syri -c ${OUT}.sam -r ${REFGENOME} -q ${QRYGENOME} -k -F S --nosnp 
 
 #Plotting genomic structures predicted by SyRI
-python3 $PATH_TO_PLOTSR syri.out refgenome qrygenome -H 8 -W 5
+python3 $PATH_TO_PLOTSR ${OUT}_syri.out ${REFGENOME} ${QRYGENOME} -H 8 -W 5
+```
 
+alt code below?
+
+```
 #Using SyRI to identify genomic rearrangements from whole-genome alignments generated using MUMmer
-nucmer --maxmatch -c 100 -b 500 -l 50 refgenome qrygenome       # Whole genome alignment. Any other alignment can also be used.
-delta-filter -m -i 90 -l 100 out.delta > out.filtered.delta     # Remove small and lower quality alignments
-show-coords -THrd out.filtered.delta > out.filtered.coords      # Convert alignment information to a .TSV format as required by SyRI
-python3 $PATH_TO_SYRI -c out.filtered.coords -d out.filtered.delta -r refgenome -q qrygenome
-python3 $PATH_TO_PLOTSR syri.out refgenome qrygenome -H 8 -W 5
+nucmer --maxmatch -c 100 -b 500 -l 50 ${REFGENOME} ${QRYGENOME}       # Whole genome alignment
+delta-filter -m -i 90 -l 100 ${OUT}.delta > ${OUT}.filtered.delta     # Remove small and lower quality alignments
+show-coords -THrd ${OUT}.filtered.delta > ${OUT}.filtered.coords      # Convert alignment information to a .TSV format as required by SyRI
+python3 $PATH_TO_SYRI -c ${OUT}.filtered.coords -d ${OUT}.filtered.delta -r ${REFGENOME} -q ${QRYGENOME}
+python3 $PATH_TO_PLOTSR ${OUT}_syri.out refgenome qrygenome -H 8 -W 5
 ```
 ## Comparison across methods
 
