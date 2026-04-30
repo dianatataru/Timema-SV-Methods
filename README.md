@@ -2203,13 +2203,14 @@ write.table(round(ldak6$posterior,5),file="FHA_ldak6.txt",quote=F,row.names=F,co
 
 
 ```
-## WHole genome assembly Pairwise comparison with syRI
+## Whole genome assembly Pairwise comparison with syRI
 
 ### install
 ```
 conda activate syRI
 conda install python=3.5
-conda install cython numpy scipy pandas=0.23.4 biopython psutil matplotlib=3.0.0 # did not work because of   - matplotlib=3.0.0*
+conda install cython numpy scipy pandas=0.23.4 biopython psutil
+conda install -c defaults matplotlib=3.0.0
 conda install -c conda-forge python-igraph 
 conda install -c bioconda pysam 
 conda install -c bioconda longestrunsubsequence 
@@ -2218,8 +2219,97 @@ conda install -c bioconda longestrunsubsequence
 ### prepare fasta files
 from documentation (https://schneebergerlab.github.io/syri/pipeline.html): Ideally, syri expects that the homologous chromosomes in the two genomes would have exactly same chromosome id. Therefore, it is recommended that the user pre-processes the fasta files to ensure that homologous chromosomes have exactly the same id in both fasta files corresponding to the two genomes. In case, that is not the case, syri would try to find homologous genomes using whole genome alignments, but that method is heuristical and can result in suboptimal results. Also, it is recommended that the two genomes (fasta files) should have same number of chromosomes.
 
+pthon script to rename based on table from science:
+'''
+#!/usr/bin/env python3
+"""
+Rename fasta scaffold headers to homologous chromosome IDs for SyRI.
+Scaffold_N__... -> >Chr1, >Chr2, etc. based on lookup table.
+"""
+
+import os
+import re
+
+# --- Configuration ---
+INPUT_DIR = "/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes"
+OUTPUT_DIR = "/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/renamed"
+
+# Chromosome mapping table: Chr -> {genome: scaffold_number}
+# Columns: Chr | UGS | RGS1 | RGS2 | RGUS1 | RGUS2 | HGS1 | HGS2 | HGUS1 | HGUS2
+CHROM_TABLE = [
+    #Chr   UGS    RGS1  RGS2  RGUS1  RGUS2  HGS1  HGS2  HGUS1  HGUS2
+    ( 1,  8483,    12,   10,    4,     6,    13,   13,    22,    15),
+    ( 2, 14640,     6,    8,   11,     9,     5,    6,    23,     1),
+    ( 3, 42935,     2,    1,    1,     1,     3,    2,    16,     3),
+    ( 4, 42912,     1,    1,    1,     1,     1,    1,    64,    35),
+    ( 5, 18722,     7,    2,    6,     4,    12,   12,     5,    10),
+    ( 6,  9928,     8,    5,    7,     5,     4,    5,    11,    44),
+    ( 7, 10660,    10,    7,   10,    11,    10,    8,    54,     7),
+    ( 8,  7748,    11,    9,    3,     3,    11,    4,     7,    23),
+    ( 9, 16151,     5,    4,    9,     8,     8,    9,    46,    21),
+    (10, 14160,     4,    3,    8,    10,     7,    7,    15,    16),
+    (11, 12033,     9,    6,    5,     7,     9,   10,     2,    12),
+    (12, 12380,    13,   12,   12,    12,     6,   11,     1,    36),
+    (13, 14101,     3,   11,    2,     2,     2,    3,    36,     8),
+]
+
+# Genome file mapping: filename -> (genome_name, column index in CHROM_TABLE)
+# hapltypes with scaffold 1 fusion excluded from these
+GENOMES = {
+    "t_crist_hwy154_cen4119_hap1.fasta.masked": ("HGS1",  6),
+    "t_crist_hwy154_cen4119_hap2.fasta.masked": ("HGS2",  7),
+    "t_crist_hwy154_cen4280_hap1.fasta.masked": ("HGUS1", 8),
+    "t_crist_hwy154_cen4280_hap2.fasta.masked": ("HGUS2", 9),
+    "t_crist_refug_cen4122_hap1.fasta.masked":  ("RGS1", 2),
+
+}
+
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+for filename, (genome_name, col_idx) in GENOMES.items():
+    input_path = os.path.join(INPUT_DIR, filename)
+    output_path = os.path.join(OUTPUT_DIR, filename)
+
+    # Build scaffold_number -> ChrN mapping for this genome
+    scaffold_to_chr = {}
+    for row in CHROM_TABLE:
+        chr_num = row[0]
+        scaffold_num = row[col_idx]
+        scaffold_to_chr[scaffold_num] = f"Chr{chr_num}"
+
+    print(f"Processing {genome_name}: {filename}")
+    print(f"  Scaffold -> Chr mapping: {scaffold_to_chr}")
+
+    renamed = 0
+    with open(input_path, "r") as fin, open(output_path, "w") as fout:
+        for line in fin:
+            if line.startswith(">"):
+                # Extract N from ">Scaffold_N__..."
+                match = re.match(r">Scaffold_(\d+)__", line)
+                if match:
+                    scaffold_num = int(match.group(1))
+                    if scaffold_num in scaffold_to_chr:
+                        new_header = f">{scaffold_to_chr[scaffold_num]}\n"
+                        fout.write(new_header)
+                        renamed += 1
+                    else:
+                        print(f"  WARNING: Scaffold_{scaffold_num} not found in mapping table, keeping original header")
+                        fout.write(line)
+                else:
+                    print(f"  WARNING: Could not parse header: {line.strip()}, keeping original")
+                    fout.write(line)
+            else:
+                fout.write(line)
+
+    print(f"  Done: {renamed}/13 chromosomes renamed -> {output_path}\n")
+
+print("All genomes processed.")
+print(f"Renamed fastas are in: {OUTPUT_DIR}")
+'''
+To run it:
 ```
 #rename
+python3 rename_fasta_headers.py
 
 #unzip
 gzip -df genome1.fna.gz
