@@ -2209,7 +2209,7 @@ write.table(round(ldak6$posterior,5),file="FHA_ldak6.txt",quote=F,row.names=F,co
 ```
 conda activate syRI
 conda install python=3.11
-conda install cython numpy scipy pandas biopython psutil matplotlib
+conda install cython numpy scipy pandas biopython psutil matplotlib plotsr
 conda install -c conda-forge python-igraph 
 conda install -c bioconda pysam 
 conda install -c bioconda longestrunsubsequence
@@ -2314,28 +2314,121 @@ python3 rename_fasta_headers.py
 then I want to fuse the chromosomes 3&4 in the reference to match the three fused haplotypes. I believe the orienation is like this, 3 different version os fhte reference GSH2:
 RGUS1 version: Chr3 + Chr 4 fused
 RGUS2 version: Chr4 + Chr3 fused
-RGS2: Chr4+Chr3 reversed
+RGS2: Chr4+Chr3 inverted
 
-length chr 3 (HGS2): 137956696
-length chr 4 (HGS2): 97222829
+length chr 2 (3 in final; HGS2): 157594472 
+length chr 1 (4 in final; (HGS2): 160647933 
 length chr1 (RGS2): 318039304
 length chr1 (RGUS1): 320397043
 length chr1(RGUS2): 322377046
 
-# HGS1 - Chr3 is Scaffold_3, Chr4 is Scaffold_4
-grep "^>Scaffold_3__\|^>Scaffold_4__" t_crist_hwy154_cen4119_hap1.fasta.masked.fai
->Scaffold_3__2_contigs__length_157762941
->Scaffold_4__1_contigs__length_83123752
+So then the code to flip these would be this python script ```python3 create_fused_references.py```:
 
-# HGUS1 - Chr3 is Scaffold_16, Chr4 is Scaffold_64
-grep "^>Scaffold_16__\|^>Scaffold_64__" t_crist_hwy154_cen4280_hap1.fasta.masked.fai
+```
+#!/usr/bin/env python3
+"""
+Create three versions of the HGS2 reference genome with Chr3 and Chr4 fused,
+matching the fusion arrangements in RGS2, RGUS1, and RGUS2.
 
-# HGUS2 - Chr3 is Scaffold_3, Chr4 is Scaffold_35
-grep "^>Scaffold_3\|^>Scaffold_35" t_crist_hwy154_cen4280_hap2.fasta.masked | head
+Fusion arrangements:
+  RGUS1 version: Chr3 + Chr4  (Chr3 first, Chr4 appended)
+  RGUS2 version: Chr4 + Chr3  (Chr4 first, Chr3 appended)
+  RGS2  version: Chr4 + revcomp(Chr3)  (Chr4 first, Chr3 reverse complemented appended)
 
-and then some check for synteny with progressive cactus.
+The fused scaffold is named Chr3 in all versions (as Chr4 is absorbed into it),
+and Chr4 is removed as a separate entry.
+"""
 
-### example SyRI pipeline
+import os
+
+INPUT_FASTA = "/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/renamed/t_crist_hwy154_cen4119_hap2.fasta.masked"
+OUTPUT_DIR  = "/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/renamed"
+
+COMPLEMENT = str.maketrans("ACGTacgtNn", "TGCAtgcaNn")
+
+def revcomp(seq):
+    return seq.translate(COMPLEMENT)[::-1]
+
+def parse_fasta(filepath):
+    """Read fasta into ordered list of (header, sequence) tuples."""
+    records = []
+    header = None
+    seq_parts = []
+    with open(filepath, "r") as f:
+        for line in f:
+            line = line.rstrip()
+            if line.startswith(">"):
+                if header is not None:
+                    records.append((header, "".join(seq_parts)))
+                header = line[1:]
+                seq_parts = []
+            else:
+                seq_parts.append(line)
+        if header is not None:
+            records.append((header, "".join(seq_parts)))
+    return records
+
+def write_fasta(records, filepath, line_width=50):
+    with open(filepath, "w") as f:
+        for header, seq in records:
+            f.write(f">{header}\n")
+            for i in range(0, len(seq), line_width):
+                f.write(seq[i:i+line_width] + "\n")
+records = parse_fasta(INPUT_FASTA)
+
+# Extract Chr3 and Chr4, keep everything else in order
+chr3_seq = None
+chr4_seq = None
+other_records = []
+
+for header, seq in records:
+    name = header.split()[0]
+    if name == "Chr3":
+        chr3_seq = seq
+        print(f"  Found Chr3: {len(seq):,} bp")
+    elif name == "Chr4":
+        chr4_seq = seq
+        print(f"  Found Chr4: {len(seq):,} bp")
+    else:
+        other_records.append((header, seq))
+
+if chr3_seq is None or chr4_seq is None:
+    raise ValueError("Could not find Chr3 and/or Chr4 in input fasta. Check header names.")
+
+# Define the three fusion versions
+versions = {
+    "RGUS1": (chr3_seq + chr4_seq,         "Chr3 + Chr4"),
+    "RGUS2": (chr4_seq + chr3_seq,         "Chr4 + Chr3"),
+    "RGS2":  (chr4_seq + revcomp(chr3_seq),"Chr4 + revcomp(Chr3)"),
+}
+
+for genome_name, (fused_seq, description) in versions.items():
+    # Build record list: replace Chr3 with fused sequence, drop Chr4
+    output_records = []
+    for header, seq in records:
+        name = header.split()[0]
+        if name == "Chr3":
+            output_records.append((f"Chr3", fused_seq))
+            print(f"\n  {genome_name}: fusing {description} -> {len(fused_seq):,} bp")
+        elif name == "Chr4":
+            pass  # absorbed into Chr3
+        else:
+            output_records.append((header, seq))
+
+    outfile = os.path.join(OUTPUT_DIR, f"t_crist_hwy154_cen4119_hap2.fasta.masked.fused_{genome_name}")
+    write_fasta(output_records, outfile)
+
+print("\nDone. Created 3 fused reference versions:")
+```
+make genomes file for plotsr:
+
+```
+# Create genomes file
+echo "/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/renamed/t_crist_hwy154_cen4119_hap2.fasta.masked	HGS2
+/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/renamed/t_crist_hwy154_cen4119_hap1.fasta.masked.reoriented	HGS1" > genomes.txt
+```
+
+### Run SyRI pipeline
 ```
 #!/bin/bash
 #SBATCH --time=72:00:00
@@ -2354,10 +2447,8 @@ conda activate syRI
 
 #set paths
 cwd="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/syri" 
-PATH_TO_SYRI="/uufs/chpc.utah.edu/common/home/u6071015/.conda/envs/syRI/syri/bin/syri" 
-PATH_TO_PLOTSR="/uufs/chpc.utah.edu/common/home/u6071015/.conda/envs/syRI/syri/bin/plotsr" 
 REFGENOME="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/renamed/t_crist_hwy154_cen4119_hap2.fasta.masked"
-QRYGENOME="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/renamed/t_crist_hwy154_cen4119_hap1.fasta.masked"
+QRYGENOME="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/renamed/t_crist_hwy154_cen4119_hap1.fasta.masked.reoriented"
 OUT="syri_TcrGSH2_TcrGSH1"
 
 #perform whole genome alignment
@@ -2367,19 +2458,10 @@ minimap2 -ax asm5 --eqx ${REFGENOME} ${QRYGENOME} > ${OUT}.sam
 syri -c ${OUT}.sam -r ${REFGENOME} -q ${QRYGENOME} -k -F S --nosnp 
 
 #Plotting genomic structures predicted by SyRI
-python3 $PATH_TO_PLOTSR ${OUT}_syri.out ${REFGENOME} ${QRYGENOME} -H 8 -W 5
+plotsr ${OUT}_syri.out ${REFGENOME} ${QRYGENOME} -H 8 -W 5
 ```
 
-alt code below?
-
-```
-#Using SyRI to identify genomic rearrangements from whole-genome alignments generated using MUMmer
-nucmer --maxmatch -c 100 -b 500 -l 50 ${REFGENOME} ${QRYGENOME}       # Whole genome alignment
-delta-filter -m -i 90 -l 100 ${OUT}.delta > ${OUT}.filtered.delta     # Remove small and lower quality alignments
-show-coords -THrd ${OUT}.filtered.delta > ${OUT}.filtered.coords      # Convert alignment information to a .TSV format as required by SyRI
-python3 $PATH_TO_SYRI -c ${OUT}.filtered.coords -d ${OUT}.filtered.delta -r ${REFGENOME} -q ${QRYGENOME}
-python3 $PATH_TO_PLOTSR ${OUT}_syri.out refgenome qrygenome -H 8 -W 5
-```
+I got an error that large proportions of some of the genomes were inverted, so I wrote a python script to invert the chromosomes that were flagged. in this script, I have to change the name of the genome and the chromosomes I want inverted. it is located in /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/renamed, and I can run it using ```python3 invert_chroms.py ```.
 
 
 ## Comparison across methods
