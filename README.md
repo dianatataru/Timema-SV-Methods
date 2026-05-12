@@ -175,18 +175,18 @@ haplotype 1, GS2 = striped haplotype 2, GUS1 = green haplotype 1, and GUS2 = gre
 
 |Chr |U GS |R GS1 |R GS2 |R GUS1 |R GUS2 |H GS1 |H GS2 |H GUS1 |H GUS2|
 |----|-----|------|------|-------|------ |------|------|-------|------|
-|  1 | 8483|  12  |  10  |   4   |   6   |  13  |  13  |  22   |  15  |
-| 2  |14640|   6  |   8  |  11   |   9   |   5  |   6  |  23   |   1  |
+|  1 | 8483|   6  |   8  |  11   |   9   |  13  |  13  |  22   |  15  |
+| 2  |14640|   8  |   5  |   7   |   5   |   5  |   6  |  23   |   1  |
 | 3  |42935|   2  |   1  |   1   |   1   |   3  |   2  |  16   |   3  |
 | 4  |42912|   1  |   1  |   1   |   1   |   1  |   1  |  64   |  35  |
-| 5  |18722|   7  |   2  |   6   |   4   |  12  |  12  |   5   |  10  |
-| 6  |9928 |   8  |   5  |   7   |   5   |   4  |   5  |  11   |  44  |
+| 5  |18722|  13  |  12  |  12   |  12   |  12  |  12  |   5   |  10  |
+| 6  |9928 |   7  |   2  |   6   |   4   |   4  |   5  |  11   |  44  |
 | 7  |10660|  10  |   7  |  10   |  11   |  10  |   8  |  54   |   7  |
 | 8  |7748 |  11  |   9  |   3   |   3   |  11  |   4  |   7   |  23  |
-| 9  |16151|   5  |   4  |   9   |   8   |   8  |   9  |  46   |  21  |
-| 10 |14160|   4  |   3  |   8   |  10   |   7  |   7  |  15   |  16  |
+| 9  |16151|   4  |   3  |   8   |  10   |   8  |   9  |  46   |  21  |
+| 10 |14160|  12  |  10  |   4   |   6   |   7  |   7  |  15   |  16  |
 | 11 |12033|   9  |   6  |   5   |   7   |   9  |  10  |   2   |  12  |
-| 12 |12380|  13  |  12  |  12   |  12   |   6  |  11  |   1   |  36  |
+| 12 |12380|   5  |   4  |   9   |   8   |   6  |  11  |   1   |  36  |
 | 13 |14101|   3  |  11  |   2   |   2   |   2  |   3  |  36   |   8  |
 
 ### Using sequenceTubeMap
@@ -1061,6 +1061,23 @@ vg autoindex --workflow giraffe -g cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gfa \
 
 vg convert -g TcrGSH2.gaf > TcrGSH2.gam
 vg convert -g TcrGUSH2.gaf > TcrGUSH2.gam
+
+# try to make simpler graphs with just inversion nodes
+vg find -x Scaffold_3__2_contigs__length_137956696.xg -n 6232384 -n 6232476 -c 3 | vg view -dp - | dot -Tsvg -o Scaffold3_subgraph6232384_6232476.svg
+vg find -x Scaffold_13__3_contigs__length_82050896.xg -n 2993340 -n 2993702 -c 3 | vg view -dp - | dot -Tsvg -o Scaffold13_subgraph2993340_299370.svg
+vg find -x Scaffold_13__3_contigs__length_82050896.xg -n 2993340 -n 2993702 | vg view -dp - | dot -Tsvg -o Scaffold13_subgraph2993340_299370_noc.svg
+vg find -x Scaffold_4__1_contigs__length_97222829.xg -n 5937107 -n 6725313 -n 9179874 | vg view -dp - | dot -Tsvg -o Scaffold4_subgraph5937107_9179874_6725313.svg
+vg find -x Scaffold_4__1_contigs__length_97222829.xg -n 5937107 -n 6725313 -n 9179874 | vg view -dp - | dot -Tsvg -o Scaffold4_subgraphall.svg
+vg find -x Scaffold_4__1_contigs__length_97222829.xg -n 5937107 -n 5936984 -n 9179874 -n 11242967 -c 3| vg view -dn - -u | dot -Tsvg -o Scaffold4_subgraph5937107_9179874_5936984_11242967_c3.svg
+
+vg find -x Scaffold_4__1_contigs__length_97222829.xg \
+  $(awk '{printf "-n %s ", $1}' scaff4nodes.txt) -c 3 \
+  | vg view -dn - -u | dot -Tsvg -o Scaffold4_subgraphall_c3.svg
+
+vg find -x Scaffold_9__2_contigs__length_79556474.xg \
+  $(awk '{printf "-n %s ", $1}' scaff9nodes.txt) -c 3 \
+  | vg view -dn - -u | dot -Tsvg -o Scaffold9_subgraphall_c3.svg
+
 ```
 or as sbatch script 
 ```
