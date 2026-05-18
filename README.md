@@ -1809,350 +1809,8 @@ The output files are cpntest_FHA_all.txt for the posterior mean and mlpntest_FHA
 
 ### Local PCAs to identify inversions with Lostruct
 Now for local PCAS using lostruct (https://github.com/petrelharp/local_pca?tab=readme-ov-file). Takes the output mean genotype likelihood file from last step.
-This also requires a positions.txt file, created with this code:
-bcftools query -f '%CHROM\t%POS\n' morefilt_rehead_2x_FHA_all_oneref_v2.vcf | sed 's/.*|s//' > positions.txt
+This also requires a positions.txt file, created in the sbatch script to run lostruct:
 
-lostruct.R:
-```
-library(data.table)
-#devtools::install_github("petrelharp/local_pca/lostruct")
-#for downloading in interactive R:
-#library(withr)
-#remotes::install_github("petrelharp/local_pca/lostruct", lib = "/uufs/chpc.utah.edu/common/home/u6071015/R/x86_64-pc-linux-gnu-library/4.5")
-library(lostruct)
-library(ggplot2)
-library(tidyr)
-
-
-# read the cpntest output (loci x individuals)
-coded <- as.matrix(read.table("cpntest_FHA_all.txt"))
-
-#try now with standardized data
-g_scaled <- t(scale(t(coded)))
-eigenstuff <- eigen_windows(g_scaled, win=100, k=2)
-windist <- pc_dist(eigenstuff, npc=2 )
-fit2d <- cmdscale(windist, eig=TRUE, k=2 )
-plot( fit2d$points, xlab="Coordinate 1", ylab="Coordinate 2", col=rainbow(1.2*nrow(windist)) )
-
-#flag outlier windows with MDS values beyond 4 standard deviations from the mean, Huang et al. (2020)
-#Adjacent clusters with fewer than 20 windows between them are pooled, and clusters with fewer than 5 windows are discarded.
-
-mds_points <- fit2d$points
-colnames(mds_points) <- c("MDS1", "MDS2")
-
-# Outlier count grid: k-means clusters (1:6) x SD thresholds (1:4)
-
-sd_thresholds <- 1:4
-k_values <- 1:6
-
-outlier_grid <- expand.grid(k = k_values, sd_thresh = sd_thresholds)
-
-outlier_grid$n_outliers <- mapply(function(k, sd_thresh) {
-  
-  # k-means on the 2D MDS space
-  set.seed(42)
-  km <- kmeans(mds_points, centers = k, nstart = 25)
-  
-  # Flag outliers within each cluster
-  mds_tmp <- data.frame(mds_points, cluster = km$cluster)
-  outlier_flags <- unlist(lapply(1:k, function(cl) {
-    sub <- mds_tmp[mds_tmp$cluster == cl, ]
-    flag1 <- abs(sub$MDS1 - mean(sub$MDS1)) > sd_thresh * sd(sub$MDS1)
-    flag2 <- abs(sub$MDS2 - mean(sub$MDS2)) > sd_thresh * sd(sub$MDS2)
-    flag1 | flag2
-  }))
-  
-  sum(outlier_flags)
-}, outlier_grid$k, outlier_grid$sd_thresh)
-
-# Plot
-outlier_grid<-ggplot(outlier_grid, aes(x = sd_thresh, y = k, fill = n_outliers)) +
-  geom_tile(color = "white", linewidth = 0.5) +
-  geom_text(aes(label = n_outliers), color = "white", fontface = "bold", size = 4) +
-  scale_x_continuous(breaks = sd_thresholds) +
-  scale_y_continuous(breaks = k_values) +
-  scale_fill_viridis_c(option = "magma", direction = -1) +
-  theme_classic() +
-  labs(
-    x = "SD threshold",
-    y = "k-means clusters (k)",
-    fill = "Outlier\nwindows",
-    title = "Outlier window count by SD threshold and k-means clustering"
-  )
-
-ggsave("outlier_grid.png", outlier_grid)
-
-# Build a dataframe with window index and MDS coords (track if windows were dropped)
-na_wins <- which(is.na(windist[,1]))
-win_index <- (1:nrow(windist))
-if(length(na_wins) > 0) win_index <- win_index[-na_wins]
-
-mds_df <- data.frame(
-  win_index = win_index,
-  MDS1 = mds_points[,1],
-  MDS2 = mds_points[,2]
-)
-
-# Flag outliers at 3 SD on each axis
-flag_outliers <- function(x, thresh = 3) {
-  abs(x - mean(x, na.rm=TRUE)) > thresh * sd(x, na.rm=TRUE)
-}
-
-mds_df$out_MDS1 <- flag_outliers(mds_df$MDS1)
-mds_df$out_MDS2 <- flag_outliers(mds_df$MDS2)
-
-cat("Outlier windows on MDS1:", sum(mds_df$out_MDS1), "\n")
-cat("Outlier windows on MDS2:", sum(mds_df$out_MDS2), "\n")
-
-#map windows to genomic positions
-positions <- read.table("positions.txt", header = FALSE,
-                        col.names = c("chrom", "pos"))
-positions$pos <- as.numeric(positions$pos)
-
-# Each window of 100 SNPs — get start/end position for each window
-n_snps   <- nrow(g_scaled)
-win_size <- 100
-n_wins   <- floor(n_snps / win_size)
-
-win_coords <- data.frame(
-  win_index = 1:n_wins,
-  chrom     = positions$chrom[ seq(1, n_wins * win_size, by = win_size) ],
-  start_pos = positions$pos[   seq(1, n_wins * win_size, by = win_size) ],
-  end_pos   = positions$pos[   seq(win_size, n_wins * win_size, by = win_size) ],
-  mid_pos   = rowMeans(cbind(
-    positions$pos[ seq(1,        n_wins * win_size, by = win_size) ],
-    positions$pos[ seq(win_size, n_wins * win_size, by = win_size) ]
-  ))
-)
-
-# Merge with MDS results
-mds_df <- merge(mds_df, win_coords, by = "win_index")
-mds_df$chrom_label <- sub("^(Scaffold_[^_]+)_.*", "\\1", mds_df$chrom)
-
-# plot MDS 1
-mds1_plot<-ggplot(mds_df, aes(x = mid_pos / 1e6, y = MDS1, color = out_MDS1)) +
-  geom_point(size = 1.5, alpha = 0.8) +
-  scale_color_manual(values = c("grey60", "firebrick"),
-                     labels = c("normal", "outlier")) +
-  geom_hline(yintercept = mean(mds_df$MDS1) + 3*sd(mds_df$MDS1),
-             linetype = "dashed", color = "red", linewidth = 0.5) +
-  geom_hline(yintercept = mean(mds_df$MDS1) - 3*sd(mds_df$MDS1),
-             linetype = "dashed", color = "red", linewidth = 0.5) +
-  facet_wrap(~chrom_label, scales = "free_x") +  # one panel per chromosome
-  theme_classic() +
-  labs(x = "Position (Mb)", y = "MDS1", color = "",
-       title = "Outlier windows — MDS1")
-
-ggsave("mds1_plot.png", mds1_plot)
-
-# plot MDS 2
-mds2_plot<-ggplot(mds_df, aes(x = mid_pos / 1e6, y = MDS2, color = out_MDS2)) +
-  geom_point(size = 1.5, alpha = 0.8) +
-  scale_color_manual(values = c("grey60", "firebrick"),
-                     labels = c("normal", "outlier")) +
-  geom_hline(yintercept = mean(mds_df$MDS2) + 3*sd(mds_df$MDS2),
-             linetype = "dashed", color = "red", linewidth = 0.5) +
-  geom_hline(yintercept = mean(mds_df$MDS2) - 3*sd(mds_df$MDS2),
-             linetype = "dashed", color = "red", linewidth = 0.5) +
-  facet_wrap(~chrom_label, scales = "free_x") +  # one panel per chromosome
-  theme_classic() +
-  labs(x = "Position (Mb)", y = "MDS2", color = "",
-       title = "Outlier windows — MDS2")
-
-ggsave("mds2_plot.png", mds2_plot)
-
-### now k selection and inversion identification
-
-library(cluster)
-
-# Select best k by silhouette score
-sil_scores <- sapply(2:6, function(k) {
-  set.seed(42)
-  km <- kmeans(mds_points, centers = k, nstart = 25)
-  sil <- silhouette(km$cluster, dist(mds_points))
-  mean(sil[, 3])
-})
-
-best_k <- which.max(sil_scores) + 1  
-cat("Best k:", best_k, "\n")
-
-# Plot silhouette scores
-sil_df <- data.frame(k = 2:6, silhouette = sil_scores)
-silouette_plot<-ggplot(sil_df, aes(x = k, y = silhouette)) +
-  geom_line() + geom_point(size = 3) +
-  geom_vline(xintercept = best_k, linetype = "dashed", color = "firebrick") +
-  theme_classic() +
-  labs(title = "Silhouette scores by k", x = "k", y = "Mean silhouette score")
-
-ggsave("silouette_plot.png", silouette_plot)
-
-# Assign windows to clusters and calculate z-scores
-set.seed(42)
-km_best <- kmeans(mds_points, centers = best_k, nstart = 25)
-
-mds_df$cluster <- km_best$cluster[match(mds_df$win_index, win_index)]
-mds_df$z_MDS1  <- (mds_df$MDS1 - mean(mds_df$MDS1)) / sd(mds_df$MDS1)
-mds_df$z_MDS2  <- (mds_df$MDS2 - mean(mds_df$MDS2)) / sd(mds_df$MDS2)
-
-# Identify candidate inversion regions as Consecutive windows with same cluster AND z-score > 1.5 for MDS1
-z_thresh     <- 1.5
-min_consec   <- 1
-
-find_inversion_regions_MDS1 <- function(df) {
-  # Sort by chromosome and window index
-  df <- df[order(df$chrom, df$win_index), ]
-  
-  regions <- list()
-  
-  for (chr in unique(df$chrom)) {
-    sub <- df[df$chrom == chr, ]
-    sub <- sub[order(sub$win_index), ]
-    
-    # Flag windows passing z-score threshold
-    sub$candidate <- abs(sub$z_MDS1) > z_thresh
-    
-    # Run-length encode to find consecutive stretches
-    rle_out  <- rle(paste(sub$candidate, sub$cluster))
-    ends     <- cumsum(rle_out$lengths)
-    starts   <- ends - rle_out$lengths + 1
-    
-    for (i in seq_along(rle_out$values)) {
-      idx        <- starts[i]:ends[i]
-      is_cand    <- sub$candidate[idx[1]]
-      n_wins     <- length(idx)
-      
-      if (is_cand && n_wins >= min_consec) {
-        win_rows <- sub[idx, ]
-        regions[[length(regions) + 1]] <- data.frame(
-          chrom      = chr,
-          start_pos  = min(win_rows$start_pos),
-          end_pos    = max(win_rows$end_pos),
-          n_windows  = n_wins,
-          cluster    = win_rows$cluster[1],
-          mean_z     = round(mean(win_rows$z_MDS1), 3),
-          max_z      = round(max(abs(win_rows$z_MDS1)), 3),
-          win_start  = min(win_rows$win_index),
-          win_end    = max(win_rows$win_index)
-        )
-      }
-    }
-  }
-  do.call(rbind, regions)
-}
-
-inversion_regions_MDS1 <- find_inversion_regions_MDS1(mds_df)
-cat("\nCandidate inversion regions:\n")
-print(inversion_regions)
-write.table(inversion_regions_MDS1, file = "FHA_inversion_regions_MDS1.txt", sep = "\t", row.names = FALSE)
-
-# Identify candidate inversion regions as Consecutive windows with same cluster AND z-score > 1.5 for MDS2
-z_thresh     <- 1.5
-min_consec   <- 1
-
-find_inversion_regions_MDS2 <- function(df) {
-  # Sort by chromosome and window index
-  df <- df[order(df$chrom, df$win_index), ]
-  
-  regions <- list()
-  
-  for (chr in unique(df$chrom)) {
-    sub <- df[df$chrom == chr, ]
-    sub <- sub[order(sub$win_index), ]
-    
-    # Flag windows passing z-score threshold
-    sub$candidate <- abs(sub$z_MDS2) > z_thresh
-    
-    # Run-length encode to find consecutive stretches
-    rle_out  <- rle(paste(sub$candidate, sub$cluster))
-    ends     <- cumsum(rle_out$lengths)
-    starts   <- ends - rle_out$lengths + 1
-    
-    for (i in seq_along(rle_out$values)) {
-      idx        <- starts[i]:ends[i]
-      is_cand    <- sub$candidate[idx[1]]
-      n_wins     <- length(idx)
-      
-      if (is_cand && n_wins >= min_consec) {
-        win_rows <- sub[idx, ]
-        regions[[length(regions) + 1]] <- data.frame(
-          chrom      = chr,
-          start_pos  = min(win_rows$start_pos),
-          end_pos    = max(win_rows$end_pos),
-          n_windows  = n_wins,
-          cluster    = win_rows$cluster[1],
-          mean_z     = round(mean(win_rows$z_MDS2), 3),
-          max_z      = round(max(abs(win_rows$z_MDS2)), 3),
-          win_start  = min(win_rows$win_index),
-          win_end    = max(win_rows$win_index)
-        )
-      }
-    }
-  }
-  do.call(rbind, regions)
-}
-
-inversion_regions_MDS2 <- find_inversion_regions_MDS2(mds_df)
-cat("\nCandidate inversion regions:\n")
-print(inversion_regions_MDS2)
-write.table(inversion_regions_MDS2, file = "FHA_inversion_regions_MDS2.txt", sep = "\t", row.names = FALSE)
-
-
-# PCA on each candidate region to confirm inversion signature
-run_region_pca <- function(region_row, coded_matrix, win_size = 100) {
-  # Pull the SNP rows corresponding to this window range
-  snp_start <- (region_row$win_start - 1) * win_size + 1
-  snp_end   <-  region_row$win_end   * win_size
-  snp_end   <- min(snp_end, nrow(coded_matrix))
-  
-  region_mat <- coded_matrix[snp_start:snp_end, ]
-  
-  # Remove zero-variance sites
-  row_vars   <- apply(region_mat, 1, var)
-  region_mat <- region_mat[row_vars > 1e-10, ]
-  
-  # Standardize then PCA
-  region_scaled <- t(scale(t(region_mat)))
-  pca_out       <- prcomp(t(region_scaled), center = TRUE, scale = FALSE)
-  
-  pca_out
-}
-
-# Run PCA for each region and plot
-pca_plots <- list()
-
-for (i in seq_len(nrow(inversion_regions))) {
-  reg     <- inversion_regions[i, ]
-  pca_out <- run_region_pca(reg, coded)
-  
-  pca_df  <- data.frame(
-    sample = colnames(coded),
-    PC1    = pca_out$x[, 1],
-    PC2    = pca_out$x[, 2]
-  )
-  
-  # Variance explained
-  var_exp <- round(100 * pca_out$sdev^2 / sum(pca_out$sdev^2), 1)
-  
-  p <- ggplot(pca_df, aes(x = PC1, y = PC2)) +
-    geom_point(size = 2.5, alpha = 0.8, color = "steelblue") +
-    theme_classic() +
-    labs(
-      title    = paste0("Region PCA: ", reg$chrom,
-                        " ", format(reg$start_pos, big.mark=","),
-                        "-",  format(reg$end_pos,   big.mark=",")),
-      subtitle = paste0(reg$n_windows, " windows | cluster ", reg$cluster,
-                        " | mean z = ", reg$mean_z),
-      x        = paste0("PC1 (", var_exp[1], "%)"),
-      y        = paste0("PC2 (", var_exp[2], "%)")
-    )
-  
-  pca_plots[[i]] <- p
-  print(p)
-}
-
-ggsave("inversion_plots.png",p)
-```
-run_lostruct.sh
 ```
 #!/bin/bash
 #SBATCH --output=/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/logs/lostruct_%A_%a.out
@@ -2165,11 +1823,32 @@ run_lostruct.sh
 #SBATCH --job-name=lostruct
 #SBATCH --qos gompert-grn
 
+module load bcftools
 module load R
 
-cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/bcftools_vcf
+SCRIPTDIR="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/bcftools_vcf"
+WORKDIR="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/bcftools_vcf/FHA_alignedtocen4119hap2"
 
-Rscript lostruct.R
+cd ${WORKDIR}
+
+#make positions file
+bcftools query -f '%CHROM\t%POS\n' morefilter_2x_REF_all_oneref.vcf | sed 's/.*|s//' > positions_raw.txt
+awk -F'\t' 'BEGIN {
+    map[1]=4; map[2]=3; map[3]=13; map[4]=8; map[5]=6;
+    map[6]=2; map[7]=10; map[8]=7; map[9]=9; map[10]=11;
+    map[11]=12; map[13]=1
+}
+{
+    match($1, /Scaffold_([0-9]+)__/, arr)
+    n = arr[1]+0
+    $1 = (n in map) ? "Chr" map[n] : "UNMAPPED_" $1
+    print $1 "\t" $2
+}' positions_raw.txt > positions.txt
+
+
+#Usage: Rscript ${SCRIPTDIR}/localpca_manyMDSaxes_v2.R <input_file> <output_prefix> <window_size_snps> <n_axes>
+Rscript ${SCRIPTDIR}/localpca_manyMDSaxes_v3.R cpntest_FHA_all.txt FHA_all 100 10
+
 
 ```
 
