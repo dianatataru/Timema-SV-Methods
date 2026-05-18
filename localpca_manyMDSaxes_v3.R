@@ -75,7 +75,7 @@ mds_df <- merge(mds_df, win_coords, by = "win_index")
 mds_df <- mds_df[order(mds_df$chrom, mds_df$start_pos), ]
 mds_df$chrom_label <- sub("^(Scaffold_[^_]+)_.*", "\\1", mds_df$chrom)
 
-# ── Automatically select best k for genome-wide window clustering ──────────────
+### select best k for genome-wide window clustering ###
 find_best_k <- function(data, max_k = 6, seed = 42) {
   set.seed(seed)
   max_k <- min(max_k, nrow(data) - 1)
@@ -165,7 +165,7 @@ get_outlier_runs <- function(outlier_df, min_windows = 5) {
   do.call(rbind, runs)
 }
 
-# PCA across all SNPs in a region
+### PCA across all SNPs in a region ###
 run_region_pca <- function(run_df, coded_matrix, win_size) {
   all_snps <- unlist(lapply(run_df$win_index, function(wi) {
     snp_start <- (wi - 1) * win_size + 1
@@ -183,7 +183,7 @@ run_region_pca <- function(run_df, coded_matrix, win_size) {
   prcomp(t(mat_scaled), center = TRUE, scale = FALSE)
 }
 
-#  Build one PCA plot (PC1v2 + PC2v3) per region
+####  Build one PCA plot (PC1v2 + PC2v3) per region ###
 make_pca_plots <- function(outlier_runs, coded_matrix, win_size, mds_axis) {
   plots <- list()
   z_col <- paste0("z_", mds_axis)
