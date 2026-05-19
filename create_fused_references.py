@@ -5,11 +5,10 @@ matching the fusion arrangements in RGS2, RGUS1, and RGUS2.
 
 Fusion arrangements:
   RGUS1 version: Chr3 + revcomp(Chr4)  (Chr3 first, Chr4 appended)
-  RGUS2 version: Chr4 + revcomp(Chr3)  (Chr4 first, Chr3 appended)
+  RGUS2 version: Chr4 + revcomp(Chr3)  (Chr4 first, Chr3 reverse complemented appended)
   RGS2  version: Chr4 + revcomp(Chr3)  (Chr4 first, Chr3 reverse complemented appended)
 
-The fused scaffold is named Chr3 in all versions (as Chr4 is absorbed into it),
-and Chr4 is removed as a separate entry.
+The fused scaffold is named Chr3_4.
 """
 
 import os
