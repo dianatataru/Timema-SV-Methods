@@ -4,7 +4,7 @@ Create three versions of the HGS2 reference genome with Chr3 and Chr4 fused,
 matching the fusion arrangements in RGS2, RGUS1, and RGUS2.
 
 Fusion arrangements:
-  RGUS1 version: Chr3 + revcomp(Chr4)  (Chr3 first, Chr4 appended)
+  RGUS1 version: Chr3 + revcomp(Chr4)  (Chr3 first, Chr4 reverse complemented appended)
   RGUS2 version: Chr4 + revcomp(Chr3)  (Chr4 first, Chr3 reverse complemented appended)
   RGS2  version: Chr4 + revcomp(Chr3)  (Chr4 first, Chr3 reverse complemented appended)
 
