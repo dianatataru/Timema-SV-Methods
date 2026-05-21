@@ -56,14 +56,6 @@ module load cactus/3.0.1
 
 cd /scratch/general/nfs1/u6071015/cactusNp/timema/
 
-cactus-pangenome timemaJS \
-  /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/HWY154.txt \
-  --outDir /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus \
-  --outName HWY154 \
-  --reference Hap1_t_crist_hwy154_cen4119 \
-  --maxCores 24 \
-  --vcfbub 0 --giraffe --gfa --gbz --viz --chrom-og
-
 cactus-pangenome timema8hapJS \
   /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/HWY154_REF.txt \
   --outDir /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus \
@@ -93,10 +85,9 @@ cactus-pangenome timemaJS \
 ```
 Even with 100G, past the limit (107G), increase for 8 genomes. Getting this error:
 
-```
 Got message from job at time 11-10-2025 17:18:07: Job used more disk than requested. For CWL, consider increasing the outdirMin requirement, otherwise, consider increasing the disk requirement. Job 'unzip_gz' kind-unzip_gz/instance-b62o1k6q v1 used 102.02% disk (1.9 GiB [2029998080B] used, 1.9 GiB [1989727325B] requested).
-```
-Finished after about 10 hours in interactive job.
+
+Finished after about 10 hours in interactive job wiht 200G.
 
 
 ### Investigating Cactus Pangenome Output
@@ -129,15 +120,9 @@ t_crist_hwy154_cen4119.1, 0, 1220429573, 13, 17566620, 0
 
 ```
 The outputs of HalSummarizeMutations are in this google sheet:https://docs.google.com/spreadsheets/d/1sTRpJKJHh38i-38SDlRJKjfCCZoWqW8oGsbMvjLeViY/edit?usp=sharing
-This is how the raw.vcf file looks (head):
-```
-#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	t_crist_hwy154_cen4119	t_crist_hwy154_cen4280
-Scaffold_10__1_contigs__length_74320458	8053	>36>38	A	ATA	60	AC=1;AF=1;AN=1;AT=>36>38,>36>37>38;NS=1;LV=0	GT	.|.	1|.
-Scaffold_10__1_contigs__length_74320458	13799	>43>45	T	TC	60	AC=1;AF=1;AN=1;AT=>43>45,>43>44>45;NS=1;LV=0	GT	.|.	1|.
-Scaffold_10__1_contigs__length_74320458	14013	>45>47	GA	G	60	AC=1;AF=1;AN=1;AT=>45>46>47,>45>47;NS=1;LV=0	GT	.|.	1|.
-```
+
 From Science paper (Gompert et al. 2025), length of chromosomes:
-*NOTE: The Refugio scaffolds were incorrect in this paper, I corrected them using pairwise synteny*
+*NOTE: The Refugio scaffolds were incorrect in this paper, I corrected them using pairwise synteny and correct ones are listed below*
 
 Table S1: Homologous relationships among chromosome-size scaffolds for the T. cristinae
 genomes. Chromosome 13 is the X sex chromosome. Abbreviations are as follows: Chr = chromosome,
@@ -164,7 +149,6 @@ haplotype 1, GS2 = striped haplotype 2, GUS1 = green haplotype 1, and GUS2 = gre
 ### Using sequenceTubeMap
 
 Downloaded to local computer using these instructions: https://github.com/vgteam/sequenceTubeMap?tab=readme-ov-file
-
 Then to run tube map on local computer in terminal:
 
 ```
@@ -186,7 +170,6 @@ conda create -n odgi
 conda activate odgi
 mamba install -c bioconda odgi
 mamba install -c bioconda vg
-
 ```
 
 need to convert .vg to .gfa file to .og format. Sorting in OG format will also help with the complexity found in the current .viz graphs. If we want to make the loopy line plots, my understanding is that you have to do the following. Note, you have to run this chromosome by chromsome. I went into the chrom_alignments folder and moved older alignments into old_alignments subdirectory to run all of this on the HWY154_4119Hap2 reference with all 8 genomes. 
@@ -377,7 +360,7 @@ The output header of the pantree.vcf.gz looks like this:
 ##INFO=<ID=NIA,Number=1,Type=Integer,Description="Nearly identical alleles (1=yes, 0=no)">
 ##INFO=<ID=UIDX,Number=1,Type=Integer,Description="Index of node u">
 ```
-Now to summarize the output vcf using code from their paper (https://github.com/ShenghanZhang1123/graph_var_analysis/blob/main/notebooks/generating_data_analysis.ipynb) in a script I wrote called pantree_summary.py:
+Now to summarize the output vcf using code from their paper (https://github.com/ShenghanZhang1123/graph_var_analysis/blob/main/notebooks/generating_data_analysis.ipynb) in an adapted script I wrote called pantree_summary.py:
 
 Run it using this sbatch script, it outputs into the ```summary``` directory:
 
@@ -419,23 +402,6 @@ zcat Scaffold_9__2_contigs__length_79556474_pantree.vcf.gz \
   $8 ~ /(^|;)VT=INV(;|$)/
 ' \
 | gzip > Scaffold_9__2_contigs__length_79556474_pantree_inversions_only.vcf.gz
-
-#to subset to SVs no SNPs or bigger than 50 bp:
-
-module load bcftools
-bcftools query \
-  -f '%CHROM\t%POS\t%ID\t%INFO/AC\t%INFO/RC\t%INFO/VT\t%INFO/TP\n' \
-  Scaffold_4__1_contigs__length_97222829_pantree.vcf.gz \
-  > Scaffold_4__1_contigs__length_97222829_pantree.vcf_minimal.tsv
-
- awk -F'\t' '$6 != "SNP"' Scaffold_4__1_contigs__length_97222829_pantree.vcf_minimal.tsv \
-  > Scaffold_4_noSNPs.tsv
-
-bcftools view -i 'strlen(INFO/NR) > 50'  Scaffold_4__1_contigs__length_97222829_pantree.vcf.gz -Oz -o Scaffold_4__1_contigs__length_97222829_pantree.len50bpplus.vcf.gz
-
-bcftools query -f '%ID\t%REF\t%ALT\n' Scaffold_4__1_contigs__length_97222829_pantree_inversions_only.vcf.gz > Scaffold_4_inv_alleles.tsv
-awk '{print ">"$1"\n"$3}' Scaffold_4_inv_alleles.tsv > Scaffold_4_inv_alt.fa
-
 ```
 ### Projected pantree output back in 4119Hap2 coordinate space
 
