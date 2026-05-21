@@ -2,7 +2,7 @@
 Identifying how different methods of structural variant (SV) detection identify SVs, and whether Does SV size, frequency, or age have an effect on SV detection in different methods? Using data from this Gompert et al. 2025 (https://www.science.org/doi/10.1126/science.adp3745), and specifically focused on inversions and translocations. Here is some helpful background on pangenomics: https://pangenome.github.io/
 
 ## Pangenome Creation
-Starting off with making pangenomes with 1) 4 hwy154 genomes and 2) 8 genomes (4 hwy154 and 4 refugio) in cactus minigraph (paper:https://www.nature.com/articles/s41587-023-01793-w, documentation: https://github.com/ComparativeGenomicsToolkit/cactus/blob/master/doc/pangenome.md).
+Starting off with making the pangenome using eight genomes (4 hwy154 and 4 refugio) in cactus minigraph (paper:https://www.nature.com/articles/s41587-023-01793-w, documentation: https://github.com/ComparativeGenomicsToolkit/cactus/blob/master/doc/pangenome.md).
 
 |  POP  | STRIPE |   ID  | SHORT |HAP|    SCIENCE BOUNDS    |
 |-------|--------|-------|-------|---|----------------------|
@@ -23,15 +23,8 @@ ln -s /uufs/chpc.utah.edu/common/home/gompert-group4/data/timema/hic_genomes/t_c
 ln -s /uufs/chpc.utah.edu/common/home/gompert-group4/data/timema/hic_genomes/t_crist_refug_green/HiRise/hap1/chroms_final_assembly.fasta.masked t_crist_refug_cen4120_hap1.fasta.masked
 ln -s /uufs/chpc.utah.edu/common/home/gompert-group4/data/timema/hic_genomes/t_crist_refug_green/HiRise/hap2/chroms_final_assembly.fasta.masked t_crist_refug_cen4120_hap2.fasta.masked
 ```
-Make the HWY154.txt input file (reference can't start with same name as other samples):
 
-```
-t_crist_hwy154_cen4119.1 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap1.fasta.masked
-Hap2_t_crist_hwy154_cen4119.2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap2.fasta.masked
-t_crist_hwy154_cen4280.1 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4280_hap1.fasta.masked
-t_crist_hwy154_cen4280.2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4280_hap2.fasta.masked 
-```
-Make the HWY154_REF.txt input file:
+Make the HWY154_REF.txt input file for Minigraph-cactus:
 
 ```
 t_crist_hwy154_cen4119.1 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap1.fasta.masked
@@ -105,32 +98,10 @@ Got message from job at time 11-10-2025 17:18:07: Job used more disk than reques
 ```
 Finished after about 10 hours in interactive job.
 
-Quickly visualize output vg with tube map onlione demo:https://vgteam.github.io/sequenceTubeMap/. but the file has to be under 5 mb so subset or run on local computer.
-
 
 ### Investigating Cactus Pangenome Output
 
-halStats output:
-
-```
-#with Hap1_t_crist_hwy154_cen4119 as reference
-GenomeName,         NumChildren, Length,   NumSequences, NumTopSegments, NumBottomSegments
-Anc0,                     4,     1697544243, 645100,     0,             14123991
-t_crist_hwy154_cen4280.1, 0,     1204896739, 13,         10845222,       0
-t_crist_hwy154_cen4119.2, 0,     1226560494, 13,         10915768,       0
-t_crist_hwy154_cen4280.2, 0,     1215314917, 13,         10916299,       0
-Hap1_t_crist_hwy154_cen4119, 0,  1220429573, 13,         10949670,       0
-
-#with Hap2_t_crist_hwy154_cen4119 as reference
-GenomeName, NumChildren, Length, NumSequences, NumTopSegments, NumBottomSegments
-Anc0, 4, 1682922426, 645056, 0, 14164284
-t_crist_hwy154_cen4280.2, 0, 1215314917, 13, 10944330, 0
-t_crist_hwy154_cen4280.1, 0, 1204896739, 13, 10883086, 0
-Hap2_t_crist_hwy154_cen4119.2, 0, 1226560494, 13, 11005277, 0
-t_crist_hwy154_cen4119.1, 0, 1220429573, 13, 10903134, 0
-
-```
-and for pangenomes with Refugio included:
+halStats output for pangenomes with Refugio included:
 ```
 #Hwy 154 Striped Haplotype 1 as Reference: 
 GenomeName, NumChildren, Length, NumSequences, NumTopSegments, NumBottomSegments
@@ -166,6 +137,7 @@ Scaffold_10__1_contigs__length_74320458	13799	>43>45	T	TC	60	AC=1;AF=1;AN=1;AT=>
 Scaffold_10__1_contigs__length_74320458	14013	>45>47	GA	G	60	AC=1;AF=1;AN=1;AT=>45>46>47,>45>47;NS=1;LV=0	GT	.|.	1|.
 ```
 From Science paper (Gompert et al. 2025), length of chromosomes:
+*NOTE: The Refugio scaffolds were incorrect in this paper, I corrected them using pairwise synteny*
 
 Table S1: Homologous relationships among chromosome-size scaffolds for the T. cristinae
 genomes. Chromosome 13 is the X sex chromosome. Abbreviations are as follows: Chr = chromosome,
@@ -435,34 +407,21 @@ SCAFF="Scaffold_9__2_contigs__length_79556474"
 python pantree_summary.py --vcf /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/${SCAFF}_pantree.vcf.gz --chrom ${SCAFF}
 
 ```
-The output from this summary has only non-linear variants. I'm wondering if I also have to include a sample list for the --ref-name to be used? I'm going to try this again on Scaffold 12, the shortest one, with the samples listed. I changed the name of the original pantree vcf made to Scaffold_12__1_contigs__length_47609450_nonlinear_pantree.vcf.gz, so that it is not overwritten. This is what I added to the end of the pantree run line: 
---priority-samples t_crist_hwy154_cen4119.1,t_crist_hwy154_cen4280.1,t_crist_hwy154_cen4280.2,t_crist_refug_cen4122.1,t_crist_refug_cen4122.2,t_crist_refug_cen4120.1,t_crist_refug_cen4120.2
-
-I had to change the run time to 48 hours due to some maintenance on the cluster, should turn it back to 7 days when I can to run the remain scaffolds (2-8, 10, 11)
 
 To just output inversion vcf:
 
 ```
 salloc --time=06:00:00 --ntasks 12 --nodes=1 --account=gompert --partition=gompert-grn --qos gompert-grn
+
 zcat Scaffold_9__2_contigs__length_79556474_pantree.vcf.gz \
 | awk '
   /^#/ { print; next }
   $8 ~ /(^|;)VT=INV(;|$)/
 ' \
 | gzip > Scaffold_9__2_contigs__length_79556474_pantree_inversions_only.vcf.gz
-```
 
-For Scaffold 9, there are 3 inversions (found by my old summary script and then also by running   
-```
- bcftools query -f '%POS\n' Scaffold_9__2_contigs__length_79556474_pantree_inversions_only.vcf.gz
- ```
-Wierdly, it says that the positions for all of these inversions are 1, which doesn't make sense.
-Also, wierdly, one of the inversions has no Ref or alt? The second inversion is huge.
+#to subset to SVs no SNPs or bigger than 50 bp:
 
-to subset to SVs no SNPs or bigger than 50 bp:
-
-```
-salloc --time=06:00:00 --ntasks 12 --nodes=1 --account=gompert --partition=gompert-grn --qos gompert-grn
 module load bcftools
 bcftools query \
   -f '%CHROM\t%POS\t%ID\t%INFO/AC\t%INFO/RC\t%INFO/VT\t%INFO/TP\n' \
@@ -474,66 +433,8 @@ bcftools query \
 
 bcftools view -i 'strlen(INFO/NR) > 50'  Scaffold_4__1_contigs__length_97222829_pantree.vcf.gz -Oz -o Scaffold_4__1_contigs__length_97222829_pantree.len50bpplus.vcf.gz
 
-
 bcftools query -f '%ID\t%REF\t%ALT\n' Scaffold_4__1_contigs__length_97222829_pantree_inversions_only.vcf.gz > Scaffold_4_inv_alleles.tsv
 awk '{print ">"$1"\n"$3}' Scaffold_4_inv_alleles.tsv > Scaffold_4_inv_alt.fa
-
-module load cactus/3.0.1
-vg giraffe -Z hs37d5-pangenome.giraffe.gbz -m hs37d5-pangenome.shortread.withzip.min -z hs37d5-pangenome.shortread.zipcodes -d hs37d5-pangenome.dist -f sim.fq >mapped.gam
-
-vg giraffe \
-  -Z HWY154_REF_4119Hap2.d2.gbz \
-  -d HWY154_REF_4119Hap2.d2.dist \
-  -m HWY154_REF_4119Hap2.d2.min \
-  -f /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/Scaffold_4_inv_alt.fa \
-  > Scaffold_4_inv_alt.gam
-
-KILLED
-
-vg surject \
-  -x HWY154_REF_4119Hap2.d2.gbz \
-  -b Scaffold_4_inv_alt.gam \
-  -p Hap2_t_crist_hwy154_cen4119 \
-  > Scaffold_4_inv_alt.bam
-
-#trying to just align pantree swith to one genome
-module load minimap2
-
-
-bcftools query -f '%ID\t%REF\t%ALT\n' Scaffold_4__1_contigs__length_97222829_pantree_inversions_only.vcf.gz | \
-  awk '$3 != "." {
-    id = $1
-    gsub(/>/, "fw", id)
-    gsub(/</, "rv", id)
-    print ">" id "\n" $3
-  }' > Scaffold_4_inv_alt_clean.fa
-
-#t_crist_hwy154_cen4119_hap2
-minimap2 -cx asm5 \
-  /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_hwy154_cen4119_hap2.fasta.masked \
-  Scaffold_4_inv_alt_clean.fa \
-  > t_crist_hwy154_cen4119_hap2_scaff4_inversions.paf
-
-sort -k6,6 -k8,8n t_crist_hwy154_cen4119_hap2_scaff4_inversions.paf >t_crist_hwy154_cen4119_hap2_scaff4_inversions.srt.paf            
-paftools.js call t_crist_hwy154_cen4119_hap2_scaff4_inversions.srt.paf  > t_crist_hwy154_cen4119_hap2_scaff4_inversions.srt.paf.txt
-
-#t_crist_refug_cen4120_hap2
-minimap2 -cx asm5 \
-  /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_refug_cen4120_hap2.fasta.masked \
-  Scaffold_4_inv_alt_clean.fa \
-  >  t_crist_refug_cen4120_hap2_scaff4_inversions.paf
-
-sort -k6,6 -k8,8n t_crist_refug_cen4120_hap2_scaff4_inversions.paf > t_crist_refug_cen4120_hap2_scaff4_inversions.srt.paf            
-paftools.js call t_crist_refug_cen4120_hap2_scaff4_inversions.srt.paf   > t_crist_refug_cen4120_hap2_scaff4_inversions.srt.paf.txt
-
-#t_crist_refug_cen4122_hap1.fasta.masked
-minimap2 -cx asm5 \
-  /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/genomes/t_crist_refug_cen4122_hap1.fasta.masked \
-  Scaffold_4_inv_alt_clean.fa \
-  >  t_crist_refug_cen4122_hap1_scaff4_inversions.paf
-
-sort -k6,6 -k8,8n t_crist_refug_cen4122_hap1_scaff4_inversions.paf > t_crist_refug_cen4122_hap1_scaff4_inversions.srt.paf            
-paftools.js call t_crist_refug_cen4122_hap1_scaff4_inversions.srt.paf > t_crist_refug_cen4122_hap1_scaff4_inversions.srt.paf.txt
 
 ```
 ### Projected pantree output back in 4119Hap2 coordinate space
