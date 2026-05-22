@@ -384,7 +384,7 @@ export PYTHONPATH="/uufs/chpc.utah.edu/common/home/u6071015/software/pantree:${P
 cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree
 SCAFF="Scaffold_9__2_contigs__length_79556474"
 
-#mkdir summary
+mkdir summary
 
 #summarize SVs (edited from pantree manuscript, puts output in /summary subdir of working directory)
 python pantree_summary.py --vcf /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/pantree/${SCAFF}_pantree.vcf.gz --chrom ${SCAFF}
@@ -403,18 +403,9 @@ zcat Scaffold_9__2_contigs__length_79556474_pantree.vcf.gz \
 ' \
 | gzip > Scaffold_9__2_contigs__length_79556474_pantree_inversions_only.vcf.gz
 ```
-### Projected pantree output back in 4119Hap2 coordinate space
+### Projected pantree output back into genome coordinate spaces
 
-```
-alloc --time=10:00:00 --ntasks 24 --nodes=1 --account=gompert --partition=gompert-grn --qos=gompert-grn --mem=100G
-module load cactus/3.0.1
-vg index -x Scaffold_13__3_contigs__length_82050896.xg Scaffold_13__3_contigs__length_82050896.vg
-vg paths -x Scaffold_4__1_contigs__length_97222829.xg -L
-vg find -x Scaffold_13__3_contigs__length_82050896.xg -n 2993340 -P Hap2_t_crist_hwy154_cen4119#2#Scaffold_13__3_contigs__length_82050896
-#first number listed is node and second number is position on that path
-```
-
-search all inversion vcfs
+Script to search all inversion vcfs for genome coordinates corresponding to inversion nodes. Some genomes do not have positions for the nodes, this means that their path does not pass through that node.
 ```
 #!/bin/bash
 #SBATCH --time=72:00:00
@@ -580,8 +571,34 @@ awk 'BEGIN{OFS="\t"}
   }
 ' all_scaffolds_inversions_tcrist_genotypes_allNR.tsv > all_scaffolds_inversions_tcrist_genotypes_NRbp.tsv
 ```
+
+### Easy Pangenome Visualization with vg
+
+Can run this in an interactive job to see specific nodes from inversions:
+
+```
+module load cactus/3.0.1
+
+# try to make simpler graphs with just inversion nodes
+vg find -x Scaffold_3__2_contigs__length_137956696.xg -n 6232384 -n 6232476 -c 3 | vg view -dp - | dot -Tsvg -o Scaffold3_subgraph6232384_6232476.svg
+vg find -x Scaffold_13__3_contigs__length_82050896.xg -n 2993340 -n 2993702 -c 3 | vg view -dp - | dot -Tsvg -o Scaffold13_subgraph2993340_299370.svg
+vg find -x Scaffold_13__3_contigs__length_82050896.xg -n 2993340 -n 2993702 | vg view -dp - | dot -Tsvg -o Scaffold13_subgraph2993340_299370_noc.svg
+vg find -x Scaffold_4__1_contigs__length_97222829.xg -n 5937107 -n 6725313 -n 9179874 | vg view -dp - | dot -Tsvg -o Scaffold4_subgraph5937107_9179874_6725313.svg
+vg find -x Scaffold_4__1_contigs__length_97222829.xg -n 5937107 -n 6725313 -n 9179874 | vg view -dp - | dot -Tsvg -o Scaffold4_subgraphall.svg
+vg find -x Scaffold_4__1_contigs__length_97222829.xg -n 5937107 -n 5936984 -n 9179874 -n 11242967 -c 3| vg view -dn - -u | dot -Tsvg -o Scaffold4_subgraph5937107_9179874_5936984_11242967_c3.svg
+
+vg find -x Scaffold_4__1_contigs__length_97222829.xg \
+  $(awk '{printf "-n %s ", $1}' scaff4nodes.txt) -c 3 \
+  | vg view -dn - -u | dot -Tsvg -o Scaffold4_subgraphall_c3.svg
+
+vg find -x Scaffold_9__2_contigs__length_79556474.xg \
+  $(awk '{printf "-n %s ", $1}' scaff9nodes.txt) -c 3 \
+  | vg view -dn - -u | dot -Tsvg -o Scaffold9_subgraphall_c3.svg
+```
 ### Genome Annotation and GENESPACE visualization
 
+*This was not actually used in the paper but I am keeping the section for later reference*
+  
 We can use the genespace visualization to validate the inversions and translocations found.
 Copying over the braker3 annotations from the Science Paper:
 
@@ -779,7 +796,7 @@ dev.off()
 
 ## Pairwise comparison in Progressive Cactus
 
-We are also going to call SVs from the pairwise comparisons, specifically focusing on comparisons between the reference haplotype used for the pangenome (HWY154 Stripe Haplotype2) and the other haplotypes. For this, I am creating softlinks in ''/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus'' to existing hal files, and need to make the hal file for H154 Stripe 2/Refugio Stripe 1 pair. TO do so, I run the script run_cactus.sh in the directory. The script also requires input file cactusTcrGSH2_TcrGSR1.txt:
+We are also going to call SVs from the pairwise comparisons, specifically focusing on comparisons between the reference haplotype used for the pangenome (HWY154 Stripe Haplotype2) and the other haplotypes. For this, I am creating softlinks in ''/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus'' to existing hal files, and need to make the hal file for H154 Stripe 2/Refugio Stripe 1 pair. To do so, I run the script run_cactus.sh in the directory. The script also requires an input file with the genome name and path. For example, cactusTcrGSH2_TcrGSR1.txt:
 
 ```
 (TcrGSH2:0.010,TcrGSR1:0.010);
@@ -817,7 +834,7 @@ cp /scratch/general/nfs1/u6071015/cactusNp/cactusStripe_TcrGSH2_TcrGUSH2_DT.hal 
 
 module purge
 module load cactus/2.7.2
-#now running with new cactus version
+
 cactus timemajobStore_TcrGSH2_TcrGSR1v2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusTcrGSH2_TcrGSR1.txt cactusStripe_TcrGSH2_TcrGSR1_DTv2.hal --maxCores 80
 
 cactus timemajobStore_TcrGSH2_TcrGSR2v2 /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/progressive_cactus/cactusTcrGSH2_TcrGSR2.txt cactusStripe_TcrGSH2_TcrGSR2_DTv2.hal --maxCores 80
@@ -844,8 +861,15 @@ halSummarizeMutations cactusStripe_TcrGSH2_TcrGUSH2_DT.hal
 ```
 The output of this ended up with way too many inversions called for my new .hal file (https://docs.google.com/spreadsheets/d/1BqMnLqLyoLgIq9Shhy4W0GRIvbQmTF1AU8gqI19ijA0/edit?gid=0#gid=0), on the scale of 150-250 inversions instead of the normal 5-20 for the existing .hal files. This was because I used Cactus v1 instead of Cactus v2.7.2. I want to use Cactus v2.7.2, because it is better at calling SVs. There is still some slight differences on every cactus run between the same pairs, due to some randomness in the program.
 
-halSummarizeMutations also doesn't come up with identifiers for mutations, so what I really need is a SV caller that develops position/reference-specific (?) identifiers so that I can then tell how many are unique across the pairwise comparisons. The trick is to do this without accidentally just creating another pangenome... it seems like vg might have a way of calling SVs, which would be ideal because I think we are also going to use vg's giraffe-deepvariant workflow for sv calling for GBS data. Also, it seems rigorous compared to other SV callers (Hickey et al. Genome Biology (2020) https://doi.org/10.1186/s13059-020-1941-7).
+*Below is not the SV calling I ended up using for pairwise comparisons, but I'm keeping it here in case the workflow is helpful down the line*
 
+halSummarizeMutations also doesn't come up with identifiers for mutations, so what I really need is a SV caller that develops position/reference-specific (?) identifiers so that I can then tell how many are unique across the pairwise comparisons. The trick is to do this without accidentally just creating another pangenome... it seems like vg might have a way of calling SVs which is rigorous compared to other SV callers (Hickey et al. Genome Biology (2020) https://doi.org/10.1186/s13059-020-1941-7).
+
+New Jay paper does the following with vg deconstruct vcf output:
+- ran vcfbub to keep only top-level variant sites (snarls) less than 100 kb in size
+- used vcfwave to realign REF and ALT alleles to split nested alleles to separate entries and identify inversions >1kb
+- combined vcf files with bcftools concat, added in missing sample coolumns with bcftools query, and used bcftools fixploidy to set allele number for every site and bcftools fill tags to add AF and AC for each each site. Also used bcftools norm to split multiallelic to biallelic
+  
 For the following SV calling, GSH2 is the REF for all. 
 ```
 salloc --time=06:00:00 --ntasks 1 --nodes=1 --account=gompert --partition=gompert-grn --qos gompert-grn --mem=300G
@@ -872,7 +896,7 @@ bcftool stats cactusStripe_TcrGSH2_TcrGUSH2_min50bp.vcf.gz # number of records i
 
 #truncated due to this VCF parse error:
 #Couldn't read GT data: value not a number or '.' at TcrGSH2#0#Scaffold_10__2_contigs__length_75648701:281081 and #TcrGSH2#0#Scaffold_10__2_contigs__length_75648701:2810840
-
+#investigate just that position to see what is wrong
 vg chunk \
   -x cactusStripe_TcrGSH2_TcrGUSH2_DTv2.xg \
   -p "TcrGSH2#0#Scaffold_10__2_contigs__length_75648701:2810800-2810900" \
@@ -925,26 +949,6 @@ vg autoindex --workflow giraffe -g cactusStripe_TcrGSH2_TcrGUSH2_DTv2.gfa \
 
 # Constructing distance index for Giraffe.
 #Killed
-
-vg convert -g TcrGSH2.gaf > TcrGSH2.gam
-vg convert -g TcrGUSH2.gaf > TcrGUSH2.gam
-
-# try to make simpler graphs with just inversion nodes
-vg find -x Scaffold_3__2_contigs__length_137956696.xg -n 6232384 -n 6232476 -c 3 | vg view -dp - | dot -Tsvg -o Scaffold3_subgraph6232384_6232476.svg
-vg find -x Scaffold_13__3_contigs__length_82050896.xg -n 2993340 -n 2993702 -c 3 | vg view -dp - | dot -Tsvg -o Scaffold13_subgraph2993340_299370.svg
-vg find -x Scaffold_13__3_contigs__length_82050896.xg -n 2993340 -n 2993702 | vg view -dp - | dot -Tsvg -o Scaffold13_subgraph2993340_299370_noc.svg
-vg find -x Scaffold_4__1_contigs__length_97222829.xg -n 5937107 -n 6725313 -n 9179874 | vg view -dp - | dot -Tsvg -o Scaffold4_subgraph5937107_9179874_6725313.svg
-vg find -x Scaffold_4__1_contigs__length_97222829.xg -n 5937107 -n 6725313 -n 9179874 | vg view -dp - | dot -Tsvg -o Scaffold4_subgraphall.svg
-vg find -x Scaffold_4__1_contigs__length_97222829.xg -n 5937107 -n 5936984 -n 9179874 -n 11242967 -c 3| vg view -dn - -u | dot -Tsvg -o Scaffold4_subgraph5937107_9179874_5936984_11242967_c3.svg
-
-vg find -x Scaffold_4__1_contigs__length_97222829.xg \
-  $(awk '{printf "-n %s ", $1}' scaff4nodes.txt) -c 3 \
-  | vg view -dn - -u | dot -Tsvg -o Scaffold4_subgraphall_c3.svg
-
-vg find -x Scaffold_9__2_contigs__length_79556474.xg \
-  $(awk '{printf "-n %s ", $1}' scaff9nodes.txt) -c 3 \
-  | vg view -dn - -u | dot -Tsvg -o Scaffold9_subgraphall_c3.svg
-
 ```
 or as sbatch script 
 ```
@@ -1020,24 +1024,9 @@ INFO:    gocryptfs not found, will not be able to use gocryptfs
 slurmstepd: error: Detected 1 oom_kill event in StepId=814509.batch. Some of the step tasks have been OOM Killed.
 ```
 
-could maybe prune deeper?
-
-```
-vg prune \
-  -k 16 \
-  -X 2 \
-  -e 2 \
-  -p \
-  -t 16 \
-  cactusStripe.vg > cactusStripe.pruned.vg
-```
-New Jay paper does the following with vg deconstruct vcf output:
-- ran vcfbub to keep only top-level variant sites (snarls) less than 100 kb in size
-- used vcfwave to realign REF and ALT alleles to split nested alleles to separate entries and identify inversions >1kb
-- combined vcf files with bcftools concat, added in missing sample coolumns with bcftools query, and used bcftools fixploidy to set allele number for every site and bcftools fill tags to add AF and AC for each each site. Also used bcftools norm to split multiallelic to biallelic
-
 ## GBS Data Alignment and Variant Calling from Pangenome with VG
 
+*This is not in the paper*
 We use the vg-giraffe-pack-call workflow to align and call SVs from the GSH2-8haplotype pangenome(https://link.springer.com/article/10.1186/s13059-020-1941-7#Sec12).
 
 Input graph is the filtered pangenome output form MinigraphCactus that has been vg autoindexed to create the .dist, .shortread.zipcodes, and .shortread.withzip.min indexes. Snarls have been identified using vg snarls. This filter graph is made by removing nodes covered by fewer than 2 haplotypes from the clip graph. The distance index (.dist) is a memory-mapped file. As of vg version 1.48.0, the file will be opened in read+write mode by default. This can cause issues in HPC clusters and other distributed environments, where multiple computers try to access the same distance index file. To avoid this, make the file read-only or use a local copy of the file (chmod 444 HWY154_REF_4119Hap2.d2.dist). Joint variant calling is not possible with vg call. Here, I make a separate vcf for each sample and then will join them all with bcftools merge. I think it is possible to take the output .gam from giraffe and surject it to make bams, and then use GATK gvcf, although it is possible this would return nonsense (https://github.com/vgteam/vg/issues/1416). 
