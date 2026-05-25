@@ -42,7 +42,7 @@ cat("Windows retained:", length(valid_wins), "| Dropped:", length(na_wins), "\n"
 
 eigenstuff_valid <- eigenstuff[valid_wins, , drop = FALSE]
 
-# PC distance between windows
+# PC distance between axes 1 & 2 between windows
 windist <- pc_dist(eigenstuff_valid, npc = 2)
 
 # cap n_axes to max possible
@@ -133,7 +133,7 @@ set.seed(42)
 km_best        <- kmeans(mds_points, centers = best_k, nstart = 25)
 mds_df$cluster <- km_best$cluster
 
-# Outlier flagging
+# Outlier flagging 
 flag_outliers <- function(x, thresh = 3) {
   abs(x - mean(x, na.rm = TRUE)) > thresh * sd(x, na.rm = TRUE)
 }
