@@ -1969,18 +1969,13 @@ I got an error that large proportions of some of the genomes were inverted, so I
 
 ### merge syri.out to evaluate shared inversions
 
-I have output from syri pairwise alignments and sv calling (syri.out described here https://schneebergerlab.github.io/syri/fileformat.html) from seven different genomes aligned to the reference. They are located in their own folders: syri/syri_TsrGSH2_${QRY}/syri.out. I will write an R script to run with sbatch that loops through these files and finds all inversions (TYPE=INV, INVTR, INVDP), and then evaluates a threshold of overlap in reference position to call inversions the same by:
+I have output from syri pairwise alignments and sv calling (syri.out described here https://schneebergerlab.github.io/syri/fileformat.html) from seven different genomes aligned to the reference. They are located in their own folders: syri/syri_TsrGSH2_${QRY}/syri.out. I will write an R script to run with sbatch that loops through these files and finds all inversions (TYPE=INV, INVTR, INVDP):
 
-1) calculate the ideal overlap by where the genomes intersect in number of shared inversions
-2) use that ideal overlap to merge relevant inversions across comparisons and keep unique inversions, summarize the number of shared and unique inversions for every genome/chromosome and all genomes, and make:
-	a) a histogram of inversion sizes
-	b) a plot that shows length of inversion and frequency across genomes
-
-R script ```analyze_syri_inversions.R```:
+R script ```group_syri_inversions.R```:
 
 ```
 #!/usr/bin/env Rscript
-# Analyze inversions from syri pairwise alignments across
+# Group inversions from syri pairwise alignments across
 # multiple query genomes vs. a common reference.
 #
 # Usage: Rscript analyze_syri_inversions.R
@@ -1988,17 +1983,7 @@ R script ```analyze_syri_inversions.R```:
 
 ## Load packages
 library(dplyr)
-library(tidyr)
-library(ggplot2)
 library(purrr)
-library(stringr)
-library(GenomicRanges)  
-library(scales)
-library(cowplot)
-library(viridis)
-library(dunn.test)
-library(ggpubr)
-
 
 #### Config ####
 # Query genome identifiers (adjust as needed)
@@ -2020,11 +2005,6 @@ INV_TYPES <- c("INV", "INVTR",  "INVDP")
 
 # Output directory
 OUT_DIR <- "inversion_analysis"
-
-# Reciprocal overlap sweep range
-RO_MIN  <- 0.00
-RO_MAX  <- 1.00
-RO_STEP <- 0.01
 
 # Column names for syri.out 
 SYRI_COLS <- c(
@@ -2082,7 +2062,6 @@ all_inv <- bind_rows(inv_list)
 n_genomes <- length(inv_list)
 message(sprintf("  Loaded %d inversion records across %d genomes.",
                 nrow(all_inv), length(inv_list)))
-#Loaded 7020 inversion records across 7 genomes.
 
 size_sum <- all_inv %>%
   summarise(min    = min(inv_size),
@@ -2091,658 +2070,117 @@ size_sum <- all_inv %>%
             max    = max(inv_size))
 message(sprintf("  Size summary (bp): min=%d  median=%.0f  mean=%.0f  max=%d",
                 size_sum$min, size_sum$median, size_sum$mean, size_sum$max))
-#  Size summary (bp): min=202  median=3422  mean=107263  max=40597114
 
 # Save raw table
 write.table(all_inv,
             file.path(OUT_DIR, "all_inversions_raw.tsv"),
             sep = "\t", row.names = FALSE, quote = FALSE)
+```
 
-### plot raw inversins for chr 1 bigger thank 50 kb ###
+all_inversions_raw.tsv is then used as the input file for ```inversion.R``` script where the inversions are grouped by reciprocal overlap and then analyzed and plotted further.
 
-chr1_inv <- all_inv %>%
-  filter(ref_chr == "Chr1") %>%
-  filter(inv_size > 50000) %>%
-  arrange(ref_start) %>%
-  mutate(inv_rank = row_number())
+```
+#!/usr/bin/env Rscript
+# Group inversions from syri pairwise alignments across
+# multiple query genomes vs. a common reference.
+#
+# Usage: Rscript analyze_syri_inversions.R
+# Output directory: ./inversion_analysis/
 
-chr1_inv_raw<-ggplot(chr1_inv, aes(color = genome)) +
-  geom_segment(
-    aes(
-      x    = ref_start / 1e6,
-      xend = ref_end   / 1e6,
-      y    = inv_rank,
-      yend = inv_rank
-    ),
-    linewidth = 2,
-    lineend   = "round"
-  ) +
-  scale_x_continuous(
-    name   = "Position (Mb)",
-    labels = scales::label_number(suffix = " Mb")
-  ) +
-  scale_y_continuous(name = NULL, breaks = NULL) +
-  scale_color_brewer(palette = "Set1") +
-  labs(
-    color = "Genome",
-    title = "Inversion positions on Chr1 (ordered by ref_start)"
-  ) +
-  theme_bw(base_size = 13) +
-  theme(
-    panel.grid.minor = element_blank(),
-    panel.grid.major.y = element_blank(),
-    legend.position  = "bottom"
-  )
+## Load packages
+library(dplyr)
+library(purrr)
 
-ggsave(file.path(OUT_DIR, "fig0_chr1_inv_raw.pdf"),  chr1_inv_raw, width = 10, height = 14)
+#### Config ####
+# Query genome identifiers (adjust as needed)
+QUERY_GENOMES <- c(
+  "TcrHGS1",
+  "TcrRGUS1",
+  "TcrRGUS2",
+  "TcrRGS2",
+  "TcrRGS1",
+  "TcrHGUS2",
+  "TcrHGUS1"
+)
 
-##### RECIPROCAL OVERLAP ANALYSIS ####
-# For each genome G and RO threshold t, count how many of G's
-# inversions have RO >= t with at least one inversion in any
-# other genome. RO(A, B) = overlap_length / min(len_A, len_B)
-# This is the workflow:
-#   1. Filter by candidate pairs in which the smallest one is at least two thirds the size of the biggest
-#   2. Compute true RO on coordinates
-#   3. Count focal inversions whose best RO >= threshold t
+# Base path pattern for syri output files
+SYRI_PATH_TEMPLATE <- "syri_TcrGSH2_%s/syri.out"
 
-compute_best_ro <- function(focal_df, other_df) {
-  best_ro <- rep(0.0, nrow(focal_df))
- 
-  focal_gr <- GRanges(
-    seqnames = focal_df$ref_chr,
-    ranges   = IRanges(
-      start = pmax(1L, focal_df$ref_start),
-      end   = focal_df$ref_end
-    )
-  )
-  other_gr <- GRanges(
-    seqnames = other_df$ref_chr,
-    ranges   = IRanges(start = other_df$ref_start,
-                       end   = other_df$ref_end)
-  )
- 
-  hits <- findOverlaps(focal_gr, other_gr, ignore.strand = TRUE)
-  if (length(hits) == 0) return(best_ro)
- 
-  fi <- queryHits(hits)
-  oi <- subjectHits(hits)
- 
-  # True overlap on original coordinates
-  ov_len   <- pmax(0L,
-                   pmin(focal_df$ref_end[fi], other_df$ref_end[oi]) -
-                   pmax(focal_df$ref_start[fi], other_df$ref_start[oi]) + 1L)
-  min_size <- pmin(focal_df$inv_size[fi], other_df$inv_size[oi])
-  max_size <-  pmax(focal_df$inv_size[fi], other_df$inv_size[oi])
-  SIZE_RATIO_MIN <- 2/3
-  size_ratio <- min_size / max_size
-  ro         <- ifelse(size_ratio >= SIZE_RATIO_MIN, ov_len / min_size, 0)
- 
-  # Keep best RO per focal inversion
-  for (i in seq_along(fi)) {
-    if (ro[i] > best_ro[fi[i]]) best_ro[fi[i]] <- ro[i]
+# Inversion annotation types to include
+SV_TYPES <- c("DUP")
+
+# Output directory
+OUT_DIR <- "inversion_analysis"
+
+# Column names for syri.out 
+SYRI_COLS <- c(
+  "ref_chr", "ref_start", "ref_end",
+  "ref_seq", "qry_seq",
+  "qry_chr", "qry_start", "qry_end",
+  "unique_id", "parent_id",
+  "ann_type", "copy_status"
+)
+
+#### READ & FILTER INVERSIONS ####
+read_SV <- function(genome_id) {
+  path <- sprintf(SYRI_PATH_TEMPLATE, genome_id)
+  if (!file.exists(path)) {
+    warning(sprintf("File not found for genome %s: %s", genome_id, path))
+    return(NULL)
   }
-  best_ro
-}
- 
-ro_thresholds <- seq(RO_MIN, RO_MAX, by = RO_STEP)
-
-# compute best RO for each genome (against all others combined)
-best_ro_list <- map(names(inv_list), function(gname) {
-  focal  <- inv_list[[gname]]
-  others <- bind_rows(inv_list[setdiff(names(inv_list), gname)])
-  compute_best_ro(focal, others)
-})
-names(best_ro_list) <- names(inv_list)
- 
-sweep_results <- map_dfr(names(inv_list), function(gname) {
-  bro <- best_ro_list[[gname]]
-  map_dfr(ro_thresholds, function(t) {
-    tibble(genome = gname, ro_thresh = t, n_shared = sum(bro >= t))
-  })
-})
- 
-write.table(sweep_results,
-            file.path(OUT_DIR, "ro_sweep.tsv"),
-            sep = "\t", row.names = FALSE, quote = FALSE)
-
-#### SELECT IDEAL RO THRESHOLD ####
-
-#normalized
-sweep_normalized <- sweep_results %>%
-  group_by(genome) %>%
-  mutate(prop_shared = n_shared / max(n_shared)) %>%
-  ungroup()
-
-p0<-ggplot(sweep_normalized, aes(x = ro_thresh, y = prop_shared,
-                              color = genome, group = genome)) +
-  geom_line(linewidth = 0.9) +
-  scale_x_continuous(labels = percent_format(accuracy = 1),
-                     name   = "Minimum reciprocal overlap threshold") +
-  scale_y_continuous(labels = percent_format(accuracy = 1),
-                     name   = "Proportion of inversions with a partner") +
-  scale_color_viridis_d(option = "turbo") +
-  labs(title    = "Proportion of inversions shared vs. RO threshold",
-       subtitle = "Curves normalized to RO=0") +
-  theme_cowplot(12)
-
-ggsave(file.path(OUT_DIR, "fig1_ro_normalized.pdf"),  p0, width = 10, height = 5.5)
-
-#raw data 
-p1 <- ggplot(sweep_results,
-             aes(x = ro_thresh, y = n_shared,
-                 color = genome, group = genome)) +
-  geom_line(linewidth = 0.9, alpha = 0.85) +
-  scale_color_viridis_d(option = "turbo") +
-  scale_x_continuous(
-    name   = "Minimum reciprocal overlap threshold",
-    labels = percent_format(accuracy = 1),
-    breaks = seq(0, 1, 0.1)
-  ) +
-  scale_y_continuous(
-    name   = "Inversions with a partner in another genome",
-    labels = comma_format()
-  ) +
-  labs(
-    title    = "Shared inversions vs. reciprocal overlap threshold",
-    subtitle = sprintf(
-      "RO = overlap / min(size_A, size_B)"),
-    color    = "Query genome"
-  ) +
-  theme_cowplot(12) +
-  theme(legend.position = "right",
-        plot.subtitle    = element_text(size = 9, color = "grey40"))
- 
-ggsave(file.path(OUT_DIR, "fig1_ro_sweep.pdf"),  p1, width = 10, height = 5.5)
-  
-#### MERGE INVERSIONS USING IDEAL RO THRESHOLD ####
-#start with the largest inversions and work in
-
-cluster_inversions <- function(all_inv, ideal_ro = 0.80, size_ratio_min = 2/3) {
-  
-  # make a copy, adding cluster assignment column
-  df <- all_inv %>% mutate(cluster_id = NA_integer_)
-  
-  # Build GRanges
-  gr <- GRanges(
-    seqnames = df$ref_chr,
-    ranges   = IRanges(start = df$ref_start, end = df$ref_end)
+  df <- tryCatch(
+    read.table(path, sep = "\t", header = FALSE,
+               col.names = SYRI_COLS, quote = "",
+               comment.char = "#", fill = TRUE,
+               stringsAsFactors = FALSE),
+    error = function(e) {
+      warning(sprintf("Error reading %s: %s", path, e$message))
+      return(NULL)
+    }
   )
-  
-  next_cluster <- 1L
-  unassigned   <- which(is.na(df$cluster_id))
-  
-  while (length(unassigned) > 0) {
-    
-    # Take the largest unassigned inversion as the anchor
-    anchor_idx <- unassigned[which.max(df$inv_size[unassigned])]
-    anchor     <- df[anchor_idx, ]
-    
-    # Find all unassigned inversions that positionally overlap the anchor
-    anchor_gr <- GRanges(
-      seqnames = anchor$ref_chr,
-      ranges   = IRanges(start = anchor$ref_start, end = anchor$ref_end)
-    )
-    candidates_gr <- gr[unassigned]
-    hits <- findOverlaps(anchor_gr, candidates_gr, ignore.strand = TRUE)
-    
-    if (length(hits) == 0) {
-      # No overlaps — anchor is its own cluster
-      df$cluster_id[anchor_idx] <- next_cluster
-      next_cluster <- next_cluster + 1L
-      unassigned   <- which(is.na(df$cluster_id))
-      next
-    }
-    
-    candidate_local_idx <- subjectHits(hits)
-    candidate_global_idx <- unassigned[candidate_local_idx]
-    
-    # For each candidate, compute RO with the anchor
-    cands <- df[candidate_global_idx, ]
-    
-    ov_len <- pmax(0L,
-                   pmin(anchor$ref_end,   cands$ref_end) -
-                   pmax(anchor$ref_start, cands$ref_start) + 1L)
-    
-    min_size   <- pmin(anchor$inv_size, cands$inv_size)
-    max_size   <- pmax(anchor$inv_size, cands$inv_size)
-    size_ratio <- min_size / max_size
-    ro         <- ov_len / min_size  
-    passes <- size_ratio >= size_ratio_min & ro >= ideal_ro
-    members <- c(anchor_idx, candidate_global_idx[passes])
-    
-    # All-pairs RO check among members
-    # Keep iterating until no members are dropped
-	repeat {
-  		member_df   <- df[members, ]
-  		n           <- length(members)
-  		if (n <= 1) break
-  
-  		# Compute RO for every pair
-  		all_pass <- rep(TRUE, n)
-  		for (i in seq_len(n)) {
-			for (j in seq_len(n)) {
-      			if (i == j) next
-      			ov <- max(0L,
-                	min(member_df$ref_end[i],   member_df$ref_end[j]) -
-                	max(member_df$ref_start[i], member_df$ref_start[j]) + 1L)
-      			min_s <- min(member_df$inv_size[i], member_df$inv_size[j])
-      			max_s <- max(member_df$inv_size[i], member_df$inv_size[j])
-      			ro_ij <- ifelse(min_s / max_s >= size_ratio_min, ov / min_s, 0)
-      			if (ro_ij < ideal_ro) {
-        			all_pass[i] <- FALSE
-        			break
-      			}
-			}
-		}
-  
-		if (all(all_pass)) break  # all members pass, done
-  
-		# Drop failing members and re-check
-		members <- members[all_pass]
-	}
-    # Check that the smallest member is >= 2/3 the size of the largest
-    member_sizes <- df$inv_size[members]
-    cluster_size_ratio <- min(member_sizes) / max(member_sizes)
-    
-    if (cluster_size_ratio < size_ratio_min) {
-      # Drop the smallest members until constraint is satisfied
-      size_order <- order(member_sizes, decreasing = TRUE)
-      members_sorted <- members[size_order]
-      sizes_sorted   <- member_sizes[size_order]
-      keep <- sizes_sorted >= sizes_sorted[1] * size_ratio_min
-      members <- members_sorted[keep]
-    }
-    
-    df$cluster_id[members] <- next_cluster
-    next_cluster <- next_cluster + 1L
-    unassigned   <- which(is.na(df$cluster_id))
-  }
-  
+  if (is.null(df) || nrow(df) == 0) return(NULL)
+
+  # Keep only SV-related annotations
+  df <- df %>%
+    filter(ann_type %in% SV_TYPES) %>%
+    mutate(
+      genome   = genome_id,
+      ref_start = as.integer(ref_start),
+      ref_end   = as.integer(ref_end),
+      qry_start = as.integer(qry_start),
+      qry_end   = as.integer(qry_end),
+    ) %>%
+    mutate(
+      ref_start = pmin(ref_start, ref_end),
+      ref_end   = pmax(ref_start, ref_end),
+      inv_size  = ref_end - ref_start + 1L
+    ) %>%
+    select(genome, ref_chr, ref_start, ref_end,
+           qry_chr, qry_start, qry_end,
+           unique_id, parent_id, ann_type, inv_size)
   df
 }
 
-all_inv_clustered <- cluster_inversions(all_inv, ideal_ro = 0.80, size_ratio_min = 2/3)
+sv_list <- map(QUERY_GENOMES, read_SV)
+names(sv_list) <- QUERY_GENOMES
+sv_list  <- compact(sv_list)   # drop NULLs
+all_sv <- bind_rows(sv_list)
+n_genomes <- length(sv_list)
+message(sprintf("  Loaded %d SV records across %d genomes.",
+                nrow(all_sv), length(sv_list)))
 
-#### Double check that this looks right with another plot ###
+size_sum <- all_sv %>%
+  summarise(min    = min(inv_size),
+            median = median(inv_size),
+            mean   = mean(inv_size),
+            max    = max(inv_size))
+message(sprintf("  Size summary (bp): min=%d  median=%.0f  mean=%.0f  max=%d",
+                size_sum$min, size_sum$median, size_sum$mean, size_sum$max))
 
-chr1_inv_clustered <- all_inv_clustered %>%
-  filter(ref_chr == "Chr1") %>%
-  arrange(ref_start) %>%
-  filter(inv_size > 50000) %>%
-  mutate(
-    # Re-rank cluster_id to consecutive integers based on position
-    cluster_rank = as.integer(factor(cluster_id, 
-                                     levels = unique(cluster_id)))
-  )
-
-chr1_inv_clustered<-ggplot(chr1_inv_clustered, aes(color = genome)) +
-  geom_segment(
-    aes(
-      x    = ref_start / 1e6,
-      xend = ref_end   / 1e6,
-      y    = cluster_rank,
-      yend = cluster_rank
-    ),
-    linewidth = 2,
-    lineend   = "round"
-  ) +
-  scale_x_continuous(
-    name   = "Position (Mb)",
-    labels = scales::label_number(suffix = " Mb")
-  ) +
-  scale_y_continuous(name = NULL, breaks = NULL) +
-  scale_color_brewer(palette = "Set1") +
-  labs(
-    color = "Genome",
-    title = "Inversion positions on Chr1 (ordered by ref_start)"
-  ) +
-  theme_bw(base_size = 13) +
-  theme(
-    panel.grid.minor = element_blank(),
-    panel.grid.major.y = element_blank(),
-    legend.position  = "bottom"
-  )
-
-ggsave(file.path(OUT_DIR, "fig0b_chr1_inv_clustered.pdf"),  chr1_inv_clustered, width = 10, height = 14)
-
-#### SUMMARISE CLUSTERS ####
-
-n_genomes_total <- length(inv_list)
- 
-cluster_summary <- all_inv_clustered %>%
-  group_by(cluster_id) %>%
-  summarise(
-    ref_chr       = ref_chr[1],
-    cluster_start = min(ref_start),
-    cluster_end   = max(ref_end),
-    cluster_size  = cluster_end - cluster_start + 1L,
-    n_genomes     = n_distinct(genome),
-    genomes_list  = paste(sort(unique(genome)), collapse = ","),
-    ann_types     = paste(sort(unique(ann_type)), collapse = ","),
-    mean_inv_size = mean(inv_size, na.rm = TRUE),
-    max_inv_size  = max(inv_size, na.rm = TRUE),
-    .groups       = "drop"
-  ) %>%
-  mutate(
-    frequency = case_when(
-      n_genomes == 1 | n_genomes == n_genomes_total              ~ sprintf("Unique (1 genome)"),
-      TRUE                         ~ sprintf("Shared (%d genomes)", n_genomes)
-    )
-  )
- 
-write.table(cluster_summary,
-            file.path(OUT_DIR, "inversion_clusters_RO0.8.tsv"),
+# Save raw table
+write.table(all_sv, file.path(OUT_DIR, "all_duplications_raw.tsv"),
             sep = "\t", row.names = FALSE, quote = FALSE)
- 
-per_genome_summary <- all_inv_clustered %>%
-  left_join(cluster_summary %>% select(cluster_id, n_genomes), by = "cluster_id") %>%
-  group_by(genome, ref_chr) %>%
-  summarise(
-    n_total  = n_distinct(cluster_id),
-    n_unique = n_distinct(cluster_id[n_genomes == 1 | n_genomes == 7]),
-    n_shared = n_distinct(cluster_id[n_genomes  > 1]),
-    .groups  = "drop"
-  )
- 
-per_genome_all <- all_inv_clustered %>%
-  left_join(cluster_summary %>% select(cluster_id, n_genomes), by = "cluster_id") %>%
-  group_by(genome) %>%
-  summarise(
-    ref_chr  = "ALL",
-    n_total  = n_distinct(cluster_id),
-    n_unique = n_distinct(cluster_id[n_genomes == 1 | n_genomes == 7]),
-    n_shared = n_distinct(cluster_id[n_genomes  > 1]),
-    .groups  = "drop"
-  )
- 
-genome_summary <- bind_rows(per_genome_summary, per_genome_all)
-write.table(genome_summary,
-            file.path(OUT_DIR, "per_genome_summary_RO0.8.tsv"),
-            sep = "\t", row.names = FALSE, quote = FALSE)
- 
-message(sprintf("  Total clusters : %d", nrow(cluster_summary))) #5050
-
-message(sprintf("  Unique         : %d  (%.1f%%)",
-                sum(cluster_summary$n_genomes == 1 | cluster_summary$n_genomes == 7),
-                100 * mean(cluster_summary$n_genomes == 1| cluster_summary$n_genomes == 7))) #4044  (80.1%)
-
-message(sprintf("  Partial        : %d  (%.1f%%)",
-                sum(cluster_summary$n_genomes > 1 &
-                    cluster_summary$n_genomes < n_genomes_total),
-                100 * mean(cluster_summary$n_genomes > 1 &
-                           cluster_summary$n_genomes < n_genomes_total))) #1006  (19.9%)
-
-message(sprintf("  Total clusters > 50 kb: %d", sum(cluster_summary$max_inv_size > 50000 ))) #320
-message(sprintf("  Total clusters > 500 bp: %d", sum(cluster_summary$max_inv_size > 500 ))) #4578
-message(sprintf("  Unique > 50 kb: %d  (%.1f%%)",
-                sum((cluster_summary$n_genomes == 1 | cluster_summary$n_genomes == 7) & 
-                     cluster_summary$max_inv_size > 50000),
-                100 * mean((cluster_summary$n_genomes == 1 | cluster_summary$n_genomes == 7) & 
-                            cluster_summary$max_inv_size > 50000))) #249  (4.9%)
-#### Frequency levels ####
-
-frequency_levels <- c(
-  "Unique (1 genome)",
-  paste0("Shared (", 2:6, " genomes)")
-)
-frequency_levels <- intersect(frequency_levels, unique(cluster_summary$frequency))
-n_levels <- length(frequency_levels)
-
-size_palette <- setNames( c(
-    "#E69F00",
-    colorRampPalette(c("#56B4E9", "#009E73"))(max(1, n_levels - 2)),
-    "#CC79A7"
-  ), nm = frequency_levels )
-
-cluster_plot <- cluster_summary %>%
-  mutate(frequency = factor(frequency, levels = frequency_levels))
-  
-#### FIGURE 2A Histogram of inversion sizes by frequency ###
-
-p2a <- ggplot(cluster_plot,
-              aes(x = cluster_size / 1000, fill = frequency)) +
-  geom_histogram(bins = 60, color = "white", linewidth = 0.2, alpha = 0.9) +
-  scale_x_log10(
-    name   = "Inversion size — max per cluster (kb, log scale)",
-    labels = comma_format(accuracy = 0.1)
-  ) +
-  scale_y_continuous(name = "Number of inversion clusters") +
-  scale_fill_manual(values = size_palette) +
-  facet_wrap(~ frequency, scales = "free_y", ncol = 1) +
-  labs(title = "Inversion size distribution by frequency") +
-  theme_cowplot(11) +
-  theme(legend.position  = "none",
-        strip.background = element_rect(fill = "grey92"),
-        plot.subtitle    = element_text(size = 9, color = "grey40"))
- 
-ggsave(file.path(OUT_DIR, "fig2a_inversion_size_histogram_RO_v2.pdf"),
-       p2a, width = 8, height = 3 * n_levels)
-ggsave(file.path(OUT_DIR, "fig2a_inversion_size_histogram_RO_v2.svg"),
-       p2a, width = 8, height = 3 * n_levels)
- 
-#####  FIGURE 2B Inversion length vs. frequency ####
- 
-p2b <- ggplot(cluster_plot,
-              aes(x = frequency, y = cluster_size / 1000,
-                  fill = frequency, color = frequency)) +
-  geom_violin(alpha = 0.35, linewidth = 0.7,
-              quantiles = c(0.25, 0.5, 0.75)) +
-  geom_jitter(width = 0.18, alpha = 0.5, size = 1.2, shape = 16) +
-  scale_y_log10(
-    name   = "Inversion size — max per cluster (kb, log scale)",
-    labels = comma_format(accuracy = 0.1)
-  ) +
-  scale_x_discrete(name = "Frequency across genomes") +
-  scale_fill_manual(values = size_palette) +
-  scale_color_manual(values = size_palette) +
-  labs(title    = "Inversion length vs. frequency") +
-  theme_cowplot(12) +
-  theme(legend.position = "none",
-        axis.text.x     = element_text(angle = 30, hjust = 1),
-        plot.subtitle   = element_text(size = 9, color = "grey40"))
- 
-ggsave(file.path(OUT_DIR, "fig2b_length_vs_sharedness_RO.pdf"),
-       p2b, width = 8, height = 6)
-ggsave(file.path(OUT_DIR, "fig2b_length_vs_sharedness_RO.svg"),
-       p2b, width = 8, height = 6)
- 
-#### FIGURE 2C size vs. exact n_genomes ####
-p2c <- ggplot(cluster_summary,
-              aes(x     = as.factor(n_genomes),
-                  y     = cluster_size / 1000,
-                  size  = cluster_size / 1000,
-                  color = n_genomes)) +
-  geom_jitter(alpha = 0.6, width = 0.25, shape = 16) +
-  scale_y_log10(
-    name   = "Inversion size — max per cluster (kb, log scale)",
-    labels = comma_format(accuracy = 0.1)
-  ) +
-  scale_x_discrete(name = "Number of genomes sharing the inversion") +
-  scale_color_viridis_c(name = "# genomes", option = "turbo",
-                        limits = c(1, n_genomes_total)) +
-  scale_size_continuous(range = c(0.8, 6), guide = "none") +
-  labs(title = "Inversion size by number of genomes sharing") +
-  theme_cowplot(12) +
-  theme(plot.subtitle = element_text(size = 9, color = "grey40"))
- 
-ggsave(file.path(OUT_DIR, "fig2c_length_by_ngenomes_scatter.pdf"),
-       p2c, width = 9, height = 6)
-ggsave(file.path(OUT_DIR, "fig2c_length_by_ngenomes_scatter.svg"),
-       p2c, width = 9, height = 6)
-
-##### test for significant differences in lengths for # shared genomes ####
-
-kruskal.test(cluster_size ~ as.factor(n_genomes), data = cluster_summary)
-#Kruskal-Wallis chi-squared = 65.942, df = 6, p-value = 2.769e-12
-
-dunn.test(cluster_summary$cluster_size, 
-          cluster_summary$n_genomes, 
-          method = "BH")
-#significant difference in size between all except 1-2,3-4,5-6,5-7,-6-7
-
-#### FIGURE 3: Per-genome × chromosome stacked bar ####
-
-genome_chr_long <- per_genome_summary %>%
-  pivot_longer(cols = c(n_unique, n_shared),
-               names_to = "category", values_to = "count") %>%
-  mutate(
-    category = recode(category,
-                      n_unique = "Unique",
-                      n_shared = "Shared (partial)"),
-    category = factor(category,
-                      levels = c("Unique", "Shared (partial)"))
-  )
- 
-p3 <- ggplot(genome_chr_long,
-             aes(x = ref_chr, y = count, fill = category)) +
-  geom_col(position = "stack", color = "white", linewidth = 0.2) +
-  facet_wrap(~ genome, scales = "free_x", ncol = 2) +
-  scale_fill_manual(
-    values = c("Unique"             = "#E69F00",
-               "Shared (partial)"   = "#56B4E9",
-               "Core (all genomes)" = "#CC79A7"),
-    name = "Sharedness"
-  ) +
-  scale_y_continuous(name = "Number of inversion clusters") +
-  labs(title = "Inversions per genome and chromosome",
-       x = "Reference chromosome") +
-  theme_cowplot(10) +
-  theme(axis.text.x      = element_text(angle = 45, hjust = 1, size = 7),
-        legend.position  = "bottom",
-        plot.subtitle    = element_text(size = 9, color = "grey40"),
-        strip.background = element_rect(fill = "grey92"))
- 
-ggsave(file.path(OUT_DIR, "fig3_per_genome_chr_summary.pdf"),
-       p3, width = 12, height = 4 * ceiling(n_genomes / 2))
-ggsave(file.path(OUT_DIR, "fig3_per_genome_chr_summary.svg"),
-       p3, width = 12, height = 4 * ceiling(n_genomes / 2))
-
-#### FIGURE 4 inversions across chromosomes ####
-shared_clusters <- cluster_summary %>%
-  filter(n_genomes > 1 | n_genomes < 7 ) %>%
-  mutate(
-    fill_val = n_genomes,
-    alpha_val = 0.9
-  )
-
-unique_clusters <- cluster_summary %>%
-  filter(n_genomes == 1 | n_genomes ==7) %>%
-  mutate(
-    fill_val  = NA_real_,
-    alpha_val = 0.4
-  )
-
-chr_order <- unique(cluster_summary$ref_chr) %>%
-  .[order(as.numeric(gsub("[^0-9]", "", .)),
-          na.last = TRUE,
-          method  = "radix")]
- 
-shared_clusters <- shared_clusters %>%
-  mutate(ref_chr = factor(ref_chr, levels = chr_order))
- 
-unique_clusters <- unique_clusters %>%
-  mutate(ref_chr = factor(ref_chr, levels = chr_order))
-
-chr_lengths <- cluster_summary %>%
-  group_by(ref_chr) %>%
-  summarise(chr_len = max(cluster_end), .groups = "drop") %>%
-  mutate(ref_chr = factor(ref_chr, levels = chr_order)) %>%
-  arrange(ref_chr)
- 
-rel_widths <- chr_lengths$chr_len / max(chr_lengths$chr_len)
-
-shared_min <- min(shared_clusters$n_genomes)
-shared_max <- n_genomes
-
-SEG_Y    <- 0
-SEG_YEND <- 1
- 
-p4 <- ggplot() +
-  geom_rect(
-    data = unique_clusters,
-    aes(xmin = cluster_start, xmax = cluster_end,
-        ymin = SEG_Y,         ymax = SEG_YEND),
-    fill  = "grey75",
-    color = NA,
-    alpha = 0.5
-  ) +
-  geom_rect(
-    data = shared_clusters,
-    aes(xmin = cluster_start, xmax = cluster_end,
-        ymin = SEG_Y,         ymax = SEG_YEND,
-        fill = n_genomes),
-    color = NA,
-    alpha = 0.92
-  ) +
-  scale_fill_viridis_c(
-    name   = "# genomes\nsharing",
-    option = "plasma",
-    limits = c(shared_min, shared_max),
-    breaks = shared_min:shared_max
-  ) +
-  scale_x_continuous(
-    name   = "Reference position (Mb)",
-    labels = function(x) comma(x / 1e6, accuracy = 1)
-  ) +
-  facet_wrap(
-    ~ ref_chr,
-    ncol   = 1,
-    scales = "free_x",
-    strip.position = "left"
-  ) + 
-  labs(
-    title    = "Shared inversions across genomes",
-    subtitle = sprintf(
-      "%d shared clusters (grey = unique to 1 genome)  |  RO \u2265 %.0f%%",
-      nrow(shared_clusters), ideal_ro * 100
-    )
-  ) +
-  theme_cowplot(11) +
-  theme(
-    axis.title.y       = element_blank(),
-    axis.text.y        = element_blank(),
-    axis.ticks.y       = element_blank(),
-    axis.line.y        = element_blank(),
-    strip.text         = element_text(face = "bold", size = 9),
-    strip.background   = element_rect(fill = "grey92"),
-    strip.placement    = "outside",
-    panel.spacing      = unit(0.4, "lines"),
-    panel.border       = element_rect(color = "grey80", fill = NA, linewidth = 0.4),
-    legend.position    = "right",
-    plot.subtitle      = element_text(size = 9, color = "grey40")
-  )
- 
-n_chr    <- length(chr_order)
-
-
-ggsave(file.path(OUT_DIR, "fig4_shared_inversions_bychromosome.pdf"),
-       p4, width = 12, height = max(4, n_chr * 0.8 + 2))
-ggsave(file.path(OUT_DIR, "fig4_shared_inversions_bychromosome.svg"),
-       p4, width = 12, height = max(4, n_chr * 0.8 + 2))
-
-
-#### Final summary ####
-
-message("\n=== Analysis complete ===")
-message(sprintf("  Output directory        : %s/", OUT_DIR))
-message(sprintf("  Ideal RO threshold      : %.2f (%.0f%%)", ideal_ro, ideal_ro * 100))
-message(sprintf("  Breakpoint slop         : %d bp", BP_SLOP))
-message(sprintf("  Total clusters          : %d", nrow(cluster_summary)))
-message(sprintf("  Unique (1 genome)       : %d  (%.1f%%)",
-                sum(cluster_summary$n_genomes == 1),
-                100 * mean(cluster_summary$n_genomes == 1)))
-message(sprintf("  Core (all %d genomes)   : %d  (%.1f%%)",
-                n_genomes_total,
-                sum(cluster_summary$n_genomes == n_genomes_total),
-                100 * mean(cluster_summary$n_genomes == n_genomes_total)))
- 
-cat("\nOutputs written:\n")
-cat(paste0("  ", list.files(OUT_DIR, full.names = TRUE), "\n"))
- 
-writeLines(capture.output(sessionInfo()),
-           file.path(OUT_DIR, "sessionInfo.txt"))
 ```
-
 ## Comparison across methods
 
 To compare the success of calling across methods, we can use sveval (https://github.com/jmonlong/sveval) with vcfs from each method, or Zhang et al. 2025 then use survivor (https://www.github.com/fritzsedlazeck/SURVIVOR; version 1.0.3) (Jeffares et al., 2017) to identify homologous SV. Here is a survivor tutorial:
