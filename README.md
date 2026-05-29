@@ -2221,8 +2221,8 @@ diff expected_annotation.vcf test_annotation.vcf
 
 #softlink into HWY154_REF_4119Hap2/ folder
 ln -s /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus_pangenome/HWY154_REF_4119Hap2/HWY154_REF_4119Hap2.vcf
-ln -s /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus_pangenome/HWY154_REF_4119Hap2/HWY154_REF_4119Hap2.sv.gfa
+ln -s /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus_pangenome/HWY154_REF_4119Hap2/HWY154_REF_4119Hap2.gfa
 
 #run
-invpg  -v HWY154_REF_4119Hap2.vcf -g HWY154_REF_4119Hap2.sv.gfa -o invpg_HWY154_REF_4119Hap2.vcf -m 0.5 -d 10 -t 12
+invpg  -v HWY154_REF_4119Hap2.vcf -g HWY154_REF_4119Hap2.gfa -o invpg_HWY154_REF_4119Hap2.vcf -m 0.5 -d 10 -t 12
 #Bubbles after filtering: 209656
