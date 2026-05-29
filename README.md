@@ -2197,23 +2197,10 @@ python -m pip install . --quiet
 ```
 
 ```
-salloc --time=10:00:00 --ntasks 12 --nodes=1 --account=gompert-np --partition=gompert-np 
-#usage: invpg [-h] [-v INPUT_VCF_FILE] [-g INPUT_GFA_FILE] [-o OUTPUT_PREFIX] [-d DIV_PERCENTAGE] [-m MINCOV] [-k] [-t THREADS] [-O OUTPUT_VCF_FILE]
-  -h, --help            show this help message and exit
-  -v, --input_vcf_file INPUT_VCF_FILE
-                        Path to a VCF file.
-  -g, --input_gfa_file INPUT_GFA_FILE
-                        Path to a GFA-like file. Should be provided solely when not using minigraph graphs.
-  -o, --output_prefix OUTPUT_PREFIX
-                        Name/path of output VCF file. If parent folder of output VCF file doesn't already exist, it will be created.
-  -d, --div_percentage DIV_PERCENTAGE
-                        This parameter controls the leniency of the algorithm towards allele size difference (in nt) in the first step of variant/bubble filtering. Only the non-reference alleles that have a size difference <= (d * max allele size / 100) will go through the annotation
-                        step. (default: 10)
-  -m, --mincov MINCOV   Minimum coverage of inversion signal as fraction of bubble length. (default: 0.5)
-  -k, --keep_files      Keep temporary files after pipeline completion (mostly for debugging purposes).
-  -t, --threads THREADS
-                        Number of threads used for parallelization (minimap2).
+salloc --time=10:00:00 --ntasks 12 --nodes=1 --account=gompert-np --partition=gompert-np
+salloc --time=10:00:00 --ntasks 1 --nodes=1 --account=gompert --partition=gompert-grn --qos=gompert-grn
 
+#usage: invpg [-h] [-v INPUT_VCF_FILE] [-g INPUT_GFA_FILE] [-o OUTPUT_PREFIX] [-d DIV_PERCENTAGE] [-m MINCOV] [-k] [-t THREADS] [-
 #test
 cd test-dir
 invpg -v test_bubbles.vcf -g test_graph.gfa -o test_annotation.vcf -m 0.5 -d 10
@@ -2226,3 +2213,52 @@ ln -s /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/c
 #run
 invpg  -v HWY154_REF_4119Hap2.vcf -g HWY154_REF_4119Hap2.gfa -o invpg_HWY154_REF_4119Hap2.vcf -m 0.5 -d 10 -t 12
 #Bubbles after filtering: 209656
+#Inversion annotated bubbles: 403
+#Results output in files invpg_HWY154_REF_4119Hap2.vcf.vcf and invpg_HWY154_REF_4119Hap2.vcf.stats
+
+Total_bubbles   33224918
+Large_bubbles   209656
+Inversion_bubbles       403
+Path-explicit   45
+Alignment-rescued       519
+```
+then to extract inversion information from the vcf:
+
+```
+#!/bin/bash
+#SBATCH --time=72:00:00
+#SBATCH --nodes=1
+#SBATCH -n 24
+#SBATCH --account=gompert-np
+#SBATCH --partition=gompert-np
+#SBATCH --job-name=summarizelengths
+#SBATCH -e /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/INVPG-annot/INVPG_annot/HWY154_REF_4119Hap2/summarizelengthsgenos%j.err
+#SBATCH -o /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/INVPG-annot/INVPG_annot/HWY154_REF_4119Hap2/summarizelengthsgenos-%j.out
+
+module load bcftools
+
+vcf="invpg_HWY154_REF_4119Hap2.vcf"
+
+bcftools query -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\t%INFO/INVANNOT\t%INFO/AC\t%INFO/NS\t%INFO/AN\n' invpg_HWY154_REF_4119Hap2.vcf > invpg_HWY154_REF_4119Hap2_all.tsv
+
+awk 'BEGIN{OFS="\t";
+    # Print header with REF/ALT replaced by bp count columns
+    print "CHROM","POS","ID","REF_bp","ALT_bp","INVANNOT","AC","NS","AN"
+}
+{
+    # REF_bp: length of REF allele (col 4)
+    ref_bp = length($4)
+
+    # ALT_bp: comma-separated lengths for each ALT allele (col 5)
+    n = split($5, alts, ",")
+    alt_bp = ""
+    for (i=1; i<=n; i++) {
+        alt_bp = alt_bp (i>1 ? "," : "") length(alts[i])
+    }
+
+    # Print all fields, replacing REF and ALT with their bp counts
+    print $1, $2, $3, ref_bp, alt_bp, $6, $7, $8, $9
+}
+' invpg_HWY154_REF_4119Hap2_all.tsv > invpg_HWY154_REF_4119Hap2_sumbp.tsv
+```
+
