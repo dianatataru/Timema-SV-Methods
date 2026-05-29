@@ -2182,12 +2182,47 @@ write.table(all_sv, file.path(OUT_DIR, "all_duplications_raw.tsv"),
             sep = "\t", row.names = FALSE, quote = FALSE)
 ```
 ## Comparison across methods
+Used custom r script ```inversions.R```
 
-To compare the success of calling across methods, we can use sveval (https://github.com/jmonlong/sveval) with vcfs from each method, or Zhang et al. 2025 then use survivor (https://www.github.com/fritzsedlazeck/SURVIVOR; version 1.0.3) (Jeffares et al., 2017) to identify homologous SV. Here is a survivor tutorial:
-https://evomics.org/learning/population-and-speciation-genomics/2022-population-and-speciation-genomics/detecting-structural-variants-lab/
+## Trying a different way of calling SV from pangenome 
+
+Using the program INVPG_annot (https://github.com/SandraLouise/INVPG_annot)
 
 ```
-ls *vcf > sample_files
-./SURVIVOR merge sample_files 1000 2 1 1 0 50 sample_merged.vcf
-#maximum allowed distance of 1kb, supported by 2 callers, agree on the type (1) and on the strand (1) of the SV, at least 50bp
+#install in /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/INVPG-annot
+git clone https://github.com/SandraLouise/INVPG_annot.git
+cd INVPG_annot
+pip install -r requirements.txt --upgrade
+python -m pip install . --quiet
 ```
+
+```
+salloc --time=10:00:00 --ntasks 12 --nodes=1 --account=gompert-np --partition=gompert-np 
+#usage: invpg [-h] [-v INPUT_VCF_FILE] [-g INPUT_GFA_FILE] [-o OUTPUT_PREFIX] [-d DIV_PERCENTAGE] [-m MINCOV] [-k] [-t THREADS] [-O OUTPUT_VCF_FILE]
+  -h, --help            show this help message and exit
+  -v, --input_vcf_file INPUT_VCF_FILE
+                        Path to a VCF file.
+  -g, --input_gfa_file INPUT_GFA_FILE
+                        Path to a GFA-like file. Should be provided solely when not using minigraph graphs.
+  -o, --output_prefix OUTPUT_PREFIX
+                        Name/path of output VCF file. If parent folder of output VCF file doesn't already exist, it will be created.
+  -d, --div_percentage DIV_PERCENTAGE
+                        This parameter controls the leniency of the algorithm towards allele size difference (in nt) in the first step of variant/bubble filtering. Only the non-reference alleles that have a size difference <= (d * max allele size / 100) will go through the annotation
+                        step. (default: 10)
+  -m, --mincov MINCOV   Minimum coverage of inversion signal as fraction of bubble length. (default: 0.5)
+  -k, --keep_files      Keep temporary files after pipeline completion (mostly for debugging purposes).
+  -t, --threads THREADS
+                        Number of threads used for parallelization (minimap2).
+
+#test
+cd test-dir
+invpg -v test_bubbles.vcf -g test_graph.gfa -o test_annotation.vcf -m 0.5 -d 10
+diff expected_annotation.vcf test_annotation.vcf
+
+#softlink into HWY154_REF_4119Hap2/ folder
+ln -s /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus_pangenome/HWY154_REF_4119Hap2/HWY154_REF_4119Hap2.vcf
+ln -s /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus_pangenome/HWY154_REF_4119Hap2/HWY154_REF_4119Hap2.sv.gfa
+
+#run
+invpg  -v HWY154_REF_4119Hap2.vcf -g HWY154_REF_4119Hap2.sv.gfa -o invpg_HWY154_REF_4119Hap2.vcf -m 0.5 -d 10 -t 12
+#Bubbles after filtering: 209656
