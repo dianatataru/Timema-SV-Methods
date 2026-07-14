@@ -1023,7 +1023,50 @@ INFO:    gocryptfs not found, will not be able to use gocryptfs
 /uufs/chpc.utah.edu/sys/installdir/lmod/8.6-r8/init/bash: line 82: 1265292 Killed                  apptainer exec --nv /uufs/chpc.utah.edu/sys/installdir/cactus/3.1.4/cactus-3.1.4.sif vg $@
 slurmstepd: error: Detected 1 oom_kill event in StepId=814509.batch. Some of the step tasks have been OOM Killed.
 ```
+## Evaluating Pangenome quality with GRETL
 
+Gretl github (https://github.com/MoinSebi/gretl) and manuscript (https://academic.oup.com/bioinformatics/article/41/1/btae755/7932228)
+
+create conda environment:
+
+```
+cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus_pangenome
+conda create -n gretl_env
+conda activate gretl_env
+mamba install -c conda-forge -c bioconda gretl
+#test
+cargo test
+```
+
+run gretl:
+```
+#!/bin/bash
+#SBATCH --time=72:00:00
+#SBATCH --nodes=1
+#SBATCH -n 24
+#SBATCH --mem=100G
+#SBATCH --account=gompert
+#SBATCH --partition=gompert-grn
+#SBATCH --qos=gompert-grn
+#SBATCH --job-name=gretl
+#SBATCH -e /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/logs/gretl-%j.err
+#SBATCH -o /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/logs/gretl-%j.out
+
+module load miniforge3
+conda activate gretl_env
+
+SCAFF="Scaffold_4__1_contigs__length_97222829"
+INPUT_DIR="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus_pangenome/chrom-alignments"
+WORK_DIR="/uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/cactus_pangenome/gretl"
+
+echo "Graph-based and hybrid stats"
+./gretl stats -g ${INPUT_DIR}/${SCAFF}.gfa --pansn -o ${INPUT_DIR}/gretl_stats_${SCAFF}.txt
+
+# Path-based statistics
+#./gretl stats -g ${INPUT_DIR}/${SCAFF}.gfa --pansn -o ${INPUT_DIR}/gretl_pathstats_${SCAFF}.txt -p
+
+echo "job done"
+```
 ## GBS Data Alignment and Variant Calling from Pangenome with VG
 
 *This is not in the paper*
