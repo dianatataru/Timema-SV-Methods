@@ -2266,7 +2266,7 @@ kruskal.test(size ~ shared_methods, data = all_inv_RO) %>% print()
 
 
   # Proportion Covered ------------------------------------------------------
-genome_size <- sum(scaffold_info$scaf_length) #1226505709
+genome_size <- sum(scaffold_info$scaf_length) #1226560475
 
 # For each method, sum inverted bases and find proportion of total genome
 method_coverage_summary <- all_inv %>%
@@ -2292,6 +2292,171 @@ method_coverage_summary2 <- all_inv2 %>%
            prop_genome   = covered / genome_size)
   }) %>%
   bind_rows()
+
+#test observed vs null for proportion inverted across genome
+genome_length <- sum(scaffold_info$scaf_length)  # 1226560475
+n1 <- 285363834      # bp called by comparative alignment
+n2 <- 316242518      # bp called by local PCA
+n3 <- 78499255       # bp called by pangenome
+observed_overlap_3way <- 0.041285599 * genome_length    
+cp_lp_overlap<- 0.111157468 * genome_length
+pg_lp_overlap<- 0.010224070 * genome_length
+cp_pg_overlap<- 0.006172773 * genome_length
+  
+# proportions covered by each method
+p1 <- n1 / genome_length #cp
+p2 <- n2 / genome_length #lp
+p3 <- n3 / genome_length #pg
+
+# null probability of 3-way overlap at any given bp, assuming independence
+p_null_3way <- p1 * p2 * p3
+expected_overlap_3way <- p_null_3way * genome_length
+
+p_null_cp_lp <- p1 * p2
+expected_overlap_cp_lp <- p_null_cp_lp * genome_length
+
+p_null_pg_lp <- p2 * p3
+expected_overlap_pg_lp <- p_null_pg_lp * genome_length
+
+p_null_cp_pg <- p1 * p3
+expected_overlap_cp_pg <- p_null_cp_pg * genome_length
+
+# variance/SD under binomial null 3way
+var_null <- genome_length * p_null_3way * (1 - p_null)_3way
+sd_null <- sqrt(var_null_3way)
+
+# z-score and p-value 3way
+z <- (observed_overlap_3way - expected_overlap_3way) / sd_null
+p_value_one_sided <- 1 - pnorm(z)      # is observed MORE than expected?
+p_value_two_sided <- 2 * pnorm(-abs(z))
+
+cat("Z-score:", z, "\n")
+cat("One-sided p-value:", p_value_one_sided, "\n")
+
+# variance/SD under binomial null 2way
+var_null <- genome_length * p_null_cp_pg * (1 - p_null_cp_pg)
+sd_null <- sqrt(var_null)
+
+# z-score and p-value 2way
+z <- (cp_pg_overlap - expected_overlap_cp_pg) / sd_null
+p_value_one_sided <- 1 - pnorm(z)      # is observed MORE than expected?
+p_value_two_sided <- 2 * pnorm(-abs(z))
+
+cat("Z-score:", z, "\n")
+cat("One-sided p-value:", p_value_one_sided, "\n")
+
+#test observed vs null for number of inversions detected by any overlap
+n1 <- 3300     # inversions called by comparative alignment
+n2 <- 28      # inversions called by local PCA
+n3 <- 41      # inversions called by pangenome
+total_inversions<-3316
+observed_overlap_3way <- 10    # observed 3-way overlap 
+cp_lp_overlap<- 17
+pg_lp_overlap<- 0
+cp_pg_overlap<- 16
+
+# proportions covered by each method
+p1 <- n1 / total_inversions #cp
+p2 <- n2 / total_inversions #lp
+p3 <- n3 / total_inversions #pg
+
+# null probability of 3-way overlap, assuming independence
+p_null_3way <- p1 * p2 * p3
+expected_overlap_3way <- p_null_3way * total_inversions
+
+p_null_cp_lp <- p1 * p2
+expected_overlap_cp_lp <- p_null_cp_lp * total_inversions
+
+p_null_pg_lp <- p2 * p3
+expected_overlap_pg_lp <- p_null_pg_lp * total_inversions
+
+p_null_cp_pg <- p1 * p3
+expected_overlap_cp_pg <- p_null_cp_pg * total_inversions
+
+# variance/SD under binomial null 3way
+var_null <- total_inversions * p_null_3way * (1 - p_null_3way)
+sd_null <- sqrt(var_null)
+
+# z-score and p-value 3way
+z <- (observed_overlap_3way - expected_overlap_3way) / sd_null
+p_value_one_sided <- 1 - pnorm(z)      # is observed MORE than expected?
+p_value_two_sided <- 2 * pnorm(-abs(z))
+
+cat("Z-score:", z, "\n")
+cat("One-sided p-value:", p_value_one_sided, "\n")
+cat("Two-sided p-value:", p_value_two_sided, "\n")
+
+# variance/SD under binomial null 2way
+var_null <- total_inversions * p_null_cp_pg * (1 - p_null_cp_pg)
+sd_null <- sqrt(var_null)
+
+# z-score and p-value 2way
+z <- (cp_pg_overlap - expected_overlap_cp_pg) / sd_null
+p_value_one_sided <- 1 - pnorm(z)      # is observed MORE than expected?
+p_value_two_sided <- 2 * pnorm(-abs(z))
+
+cat("Z-score:", z, "\n")
+cat("One-sided p-value:", p_value_one_sided, "\n")
+cat("Two-sided p-value:", p_value_two_sided, "\n")
+
+#test observed vs null for number of inversions detected by 80% position 2/3 size overlap
+n1 <- 4904     # inversions called by comparative alignment
+n2 <- 32      # inversions called by local PCA
+n3 <- 49      # inversions called by pangenome
+total_inversions<-4967
+observed_overlap_3way <- 0    # observed 3-way overlap 
+cp_lp_overlap<- 5
+pg_lp_overlap<- 1
+cp_pg_overlap<- 12
+
+# proportions covered by each method
+p1 <- n1 / total_inversions #cp
+p2 <- n2 / total_inversions #lp
+p3 <- n3 / total_inversions #pg
+
+# null probability of 3-way overlap, assuming independence
+p_null_3way <- p1 * p2 * p3
+expected_overlap_3way <- p_null_3way * total_inversions
+
+p_null_cp_lp <- p1 * p2
+expected_overlap_cp_lp <- p_null_cp_lp * total_inversions
+
+p_null_pg_lp <- p2 * p3
+expected_overlap_pg_lp <- p_null_pg_lp * total_inversions
+
+p_null_cp_pg <- p1 * p3
+expected_overlap_cp_pg <- p_null_cp_pg * total_inversions
+
+# variance/SD under binomial null 3way
+var_null <- total_inversions * p_null_3way * (1 - p_null_3way)
+sd_null <- sqrt(var_null)
+
+# z-score and p-value 3way
+z <- (observed_overlap_3way - expected_overlap_3way) / sd_null
+p_value_one_sided <- 1 - pnorm(z)      # is observed MORE than expected?
+p_value_two_sided <- 2 * pnorm(-abs(z))
+
+cat("Z-score:", z, "\n")
+cat("One-sided p-value:", p_value_one_sided, "\n")
+cat("Two-sided p-value:", p_value_two_sided, "\n")
+
+# variance/SD under binomial null 2way
+var_null <- total_inversions * p_null_cp_pg * (1 - p_null_cp_pg)
+sd_null <- sqrt(var_null)
+
+# z-score and p-value 2way
+z <- (cp_pg_overlap - expected_overlap_cp_pg) / sd_null
+p_value_one_sided <- 1 - pnorm(z)      # is observed MORE than expected?
+p_value_two_sided <- 2 * pnorm(-abs(z))
+
+cat("Z-score:", z, "\n")
+cat("One-sided p-value:", p_value_one_sided, "\n")
+cat("Two-sided p-value:", p_value_two_sided, "\n")
+
+
+  # Plot shared proportion across genome ------------------------------------
+
+
 # Build GRanges per method
 methods_list <- unique(all_inv$method)
 
@@ -2534,15 +2699,19 @@ recall_df <- recall_df %>%
 
 model <- glm(detected ~ dist_nearest * method, data = recall_df, family = binomial)
 summary(model)
+logLik(model) #-796.0966 (df=6)
 
 model2 <- glm(detected ~ log1p(density_count) * method, data = recall_df, family = binomial)
 summary(model2)
+logLik(model2)
 
 model3 <- glm(detected ~ density_count * method, data = recall_df, family = binomial)
 summary(model3)
+logLik(model3)#-736.5472 (df=6)
 
 model4 <- glm(detected ~ inverted_bases_nearby * method, data = recall_df, family = binomial)
 summary(model4)
+logLik(model4)# -797.8677 (df=6)
 
 #plot predictions
 library(ggeffects)
@@ -2629,5 +2798,7 @@ pathstats_summed_small<- pathstats_summed%>%
   dplyr::select(c("Genome", "Hap", "Sequence..bp.", "Nodes", "Edges","Inverted.nodes..bp."))%>%
   mutate(PropGenomeInverted=Inverted.nodes..bp./Sequence..bp.)
 write.csv(pathstats_summed_small, "gretl_summary.csv", row.names = FALSE)
+
+
 
 
