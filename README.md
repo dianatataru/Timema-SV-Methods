@@ -647,7 +647,13 @@ awk 'BEGIN{OFS="\t"}
   }
 ' all_scaffolds_inversions_tcrist_genotypes_allNR.tsv > all_scaffolds_inversions_tcrist_genotypes_NRbp.tsv
 ```
+### test inversion calling with INVPG_annot
+program github:https://github.com/SandraLouise/INVPG_annot
 
+to run:
+```
+invpg -v HWY154_REF_4119Hap2.vcf -g HWY154_REF_4119Hap2.gfa -o invpg_HWY154_REF_4119Hap2.vcf -k -m 0.5 -d 10
+```
 ## LOCAL PCA
 
 ### GBS Data Alignment and Variant Calling with standard methods
