@@ -30,10 +30,10 @@ OUTVCF="REF_all_oneref.vcf"
 echo "Merge BAM files"
 cd "$WORKDIR"
 
-#samtools merge -f -r -c -p -@ ${THREADS} "$MERGED" "${BAM_FILES[@]}"
-#samtools sort -@ 12 -o "$SORTED" "$MERGED"
-#samtools index "$SORTED"
-#samtools flagstat "$SORTED"
+samtools merge -f -r -c -p -@ ${THREADS} "$MERGED" "${BAM_FILES[@]}"
+samtools sort -@ 12 -o "$SORTED" "$MERGED"
+samtools index "$SORTED"
+samtools flagstat "$SORTED"
 
 echo "BAM files merged"
 
@@ -42,10 +42,10 @@ echo "start variant calling"
 cd "$WORKDIR"
 
 #filter for one ref
-#bcftools mpileup -Ou -d 100000 -a DP,AD,ADF,ADR -q 20 -Q 30 -f "$genome" "$SORTED" | bcftools call -v -c -p 0.01 -Ov -o "$OUTVCF"
+bcftools mpileup -Ou -d 100000 -a DP,AD,ADF,ADR -q 20 -Q 30 -f "$genome" "$SORTED" | bcftools call -v -c -p 0.01 -Ov -o "$OUTVCF"
 
 #no filter for pangenome
-#bcftools mpileup -Ou -d 100000 -a DP,AD,ADF,ADR -f "$genome" "$SORTED" | bcftools call -v -c -Ov -o "$OUTVCF"
+bcftools mpileup -Ou -d 100000 -a DP,AD,ADF,ADR -f "$genome" "$SORTED" | bcftools call -v -c -Ov -o "$OUTVCF"
 
 #same commands as science paper
 bcftools mpileup -Ou -d 500 -a DP,AD,ADF,ADR -Q 30 -q 20 --skip-indels -f "$genome" "${BAM_FILES[@]}" | \
