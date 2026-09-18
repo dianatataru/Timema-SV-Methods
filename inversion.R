@@ -2194,7 +2194,7 @@ all_inv_RO %>%
     IQR_size = IQR(size, na.rm = TRUE),
     n = n()
   )
-# Size/Method analysis, any overlap ----------------------------------------------------
+  # Size/Method analysis, any overlap ----------------------------------------------------
 
 
 #compare size versus shared method
@@ -2265,7 +2265,7 @@ ggsave("fig_detection_by_size_RO.pdf", p_detect, width = 11, height = 5)
 kruskal.test(size ~ shared_methods, data = all_inv_RO) %>% print()
 
 
-  # Proportion Covered ------------------------------------------------------
+  # Proportion Covered and Comparison to Null------------------------------------------------------
 genome_size <- sum(scaffold_info$scaf_length) #1226560475
 
 # For each method, sum inverted bases and find proportion of total genome
@@ -2322,7 +2322,7 @@ p_null_cp_pg <- p1 * p3
 expected_overlap_cp_pg <- p_null_cp_pg * genome_length
 
 # variance/SD under binomial null 3way
-var_null <- genome_length * p_null_3way * (1 - p_null)_3way
+var_null_3way <- genome_length * p_null_3way * (1 - p_null_3way)
 sd_null <- sqrt(var_null_3way)
 
 # z-score and p-value 3way
@@ -2332,6 +2332,7 @@ p_value_two_sided <- 2 * pnorm(-abs(z))
 
 cat("Z-score:", z, "\n")
 cat("One-sided p-value:", p_value_one_sided, "\n")
+cat("Two-sided p-value:", p_value_two_sided, "\n")
 
 # variance/SD under binomial null 2way
 var_null <- genome_length * p_null_cp_pg * (1 - p_null_cp_pg)
@@ -2344,6 +2345,7 @@ p_value_two_sided <- 2 * pnorm(-abs(z))
 
 cat("Z-score:", z, "\n")
 cat("One-sided p-value:", p_value_one_sided, "\n")
+cat("Two-sided p-value:", p_value_two_sided, "\n")
 
 #test observed vs null for number of inversions detected by any overlap
 n1 <- 3300     # inversions called by comparative alignment
@@ -2379,7 +2381,7 @@ sd_null <- sqrt(var_null)
 
 # z-score and p-value 3way
 z <- (observed_overlap_3way - expected_overlap_3way) / sd_null
-p_value_one_sided <- 1 - pnorm(z)      # is observed MORE than expected?
+p_value_one_sided <- 1 - pnorm(z)      # is observed more than expected?
 p_value_two_sided <- 2 * pnorm(-abs(z))
 
 cat("Z-score:", z, "\n")
@@ -2536,7 +2538,7 @@ print(shared_prop_plot)
 ggsave("fig_shared_prop_plot.svg", shared_prop_plot, width = 10, height = 5)
 
 
-  # plot shared across chromosomes ------------------------------------------
+  # Plot shared across chromosomes ------------------------------------------
 
 gr_to_df <- function(gr, method, category) {
   if (length(gr) == 0) return(tibble())
@@ -2651,7 +2653,7 @@ walk(1:13, function(chr_num) {
 })
 
 
-# Analyze density ---------------------------------------------------------
+  # Analyze density ---------------------------------------------------------
 
 all_methods <- unique(all_inv_RO$method)
 
@@ -2735,7 +2737,7 @@ ggsave(
   height   = 8
 )
 
-# analyze gretl output ----------------------------------------------------
+  # Analyze gretl output ----------------------------------------------------
 
 
 setwd("~/Desktop/Gompert_Lab_Research/TimemaSVmethods/Cactus Pangenome/gretl/")
