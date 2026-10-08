@@ -8,6 +8,8 @@ We compare three different approaches, all which have their own subfolder in thi
 
 Overlap across the three methods is calculated and visualized in inversion.R in the main repository.
 
+The following are notes on how everything was run.
+
 ## PANGENOME
 
 Starting off with making the pangenome using eight genomes (4 hwy154 and 4 refugio) in cactus minigraph (paper:https://www.nature.com/articles/s41587-023-01793-w, documentation: https://github.com/ComparativeGenomicsToolkit/cactus/blob/master/doc/pangenome.md).
