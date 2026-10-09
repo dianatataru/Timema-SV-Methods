@@ -1153,7 +1153,7 @@ awk -F'\t' 'BEGIN {
 
 
 #Usage: Rscript ${SCRIPTDIR}/localpca_manyMDSaxes_v2.R <input_file> <output_prefix> <window_size_snps> <n_axes>
-Rscript ${SCRIPTDIR}/localpca_manyMDSaxes_withfiltering.R cpntest_FHA_all.txt FHA_all 100 10
+Rscript ${SCRIPTDIR}/localpca_manyMDSaxes_withfiltering.R af_FHA_all.txt FHA_all 100 10
 
 ```
 ## COMPARATIVE ALIGNMENT
