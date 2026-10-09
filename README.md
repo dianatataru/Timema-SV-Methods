@@ -1085,6 +1085,12 @@ when running estpEM, there are a couple parameters that can be changed.
 -m 50 — maximum number of EM iterations before giving up. The default is 20, so this increases it to 50, giving the algorithm more chances to converge at tricky loci.
 -h 2 — tells the program that your input file has 2 extra header lines to skip (beyond the required first line that specifies the number of individuals and loci). The default is 0.
 
+take the third column from the estpEM estimate for input into gl2genest
+
+```
+awk '{print $3}'  FHA_all_v2_estpEM.txt  > af_FHA_all.txt 
+```
+
 Next steps from Zach's code:
 Then obtain Bayesian estiamtes of genotypes using the allele frequency priors (under assuming HW genotype frequencies as prior expectations) for both the posterior mode and mean to compare. Compile the new C programs for the empirical Bayes genotype esimates, gl2genest.c and gl2genestMax.c. 
 gcc gl2genest.c -lm -o gl2genest
@@ -1106,9 +1112,9 @@ gcc gl2genestMax.c -lm -o gl2genestMax
 cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/bcftools_vcf
 
 ## posterior mode
-./gl2genestMax FHA_all_v2_estpEM.txt  FHA_all.gl
+./gl2genestMax  af_FHA_all.txt   FHA_all.gl
 ## posterior mean
-./gl2genest FHA_all_v2_estpEM.txt  FHA_all.gl
+./gl2genest  af_FHA_all.txt   FHA_all.gl
 
 ```
 The output files are cpntest_FHA_all.txt for the posterior mean and mlpntest_FHA_all.txt for the posterior mode. These contain 602 individuals (columns) and 5,340 SNPS (rows). To get the allele frequency file used in the next line, I extracted the estimated allele frequencies from the posterior mean from the estpEM run.
