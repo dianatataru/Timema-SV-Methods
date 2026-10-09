@@ -1111,7 +1111,7 @@ cd /uufs/chpc.utah.edu/common/home/gompert-group3/projects/timema_SVmethods/GBS/
 ./gl2genest FHA_all_v2_estpEM.txt  FHA_all.gl
 
 ```
-The output files are cpntest_FHA_all.txt for the posterior mean and mlpntest_FHA_all.txt for the posterior mode. These contain 602 individuals (columns) and 5,340 SNPS (rows). 
+The output files are cpntest_FHA_all.txt for the posterior mean and mlpntest_FHA_all.txt for the posterior mode. These contain 602 individuals (columns) and 5,340 SNPS (rows). To get the allele frequency file used in the next line, I extracted the estimated allele frequencies from the posterior mean from the estpEM run.
 
 ### Local PCAs to identify inversions with Lostruct
 Now for local PCAS using lostruct (https://github.com/petrelharp/local_pca?tab=readme-ov-file). Takes the output mean genotype likelihood file from last step.
@@ -1153,7 +1153,7 @@ awk -F'\t' 'BEGIN {
 
 
 #Usage: Rscript ${SCRIPTDIR}/localpca_manyMDSaxes_v2.R <input_file> <output_prefix> <window_size_snps> <n_axes>
-Rscript ${SCRIPTDIR}/localpca_manyMDSaxes_withfiltering.R af_FHA_all.txt FHA_all 100 10
+Rscript ${SCRIPTDIR}/localpca_manyMDSaxes_withfiltering.R cpntest_FHA_all.txt FHA_all 100 40
 
 ```
 ## COMPARATIVE ALIGNMENT
